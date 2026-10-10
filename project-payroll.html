@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project Payroll</title>
+  <style>
+    :root {
+      --ink: #1c2430;
+      --muted: #5c6b7a;
+      --line: #d7dee7;
+      --paper: #f4f7fb;
+      --card: #ffffff;
+      --accent: #0f6e6b;
+      --accent-dark: #0b5552;
+      --warn-bg: #fff6e8;
+      --warn-ink: #8a4b08;
+      --ok-bg: #e7f6f2;
+      --ok-ink: #0b5552;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Calibri, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      line-height: 1.45;
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 28px 20px 48px;
+    }
+    header h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+    }
+    .notice, .rule {
+      margin: 0;
+      color: var(--muted);
+    }
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 16px 8px;
+      margin-top: 16px;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th { color: var(--muted); font-weight: 600; }
+    td.num, th.num { text-align: right; }
+    tr.flagged td { background: var(--warn-bg); }
+    button {
+      margin: 4px 0 12px;
+      background: var(--accent);
+      color: #fff;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    button:hover { background: var(--accent-dark); }
+    button:disabled { background: #9aa8b2; cursor: default; }
+    .waiting, .success, .flag-note {
+      margin: 0 0 12px;
+    }
+    .waiting { color: var(--muted); }
+    .success {
+      background: var(--ok-bg);
+      color: var(--ok-ink);
+      padding: 10px 12px;
+      border-radius: 8px;
+    }
+    .flag-note {
+      background: var(--warn-bg);
+      color: var(--warn-ink);
+      padding: 10px 12px;
+      border-radius: 8px;
+    }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Project Payroll</h1>
+      <p class="notice">Example data only. Not real employee records.</p>
+      <p class="rule">Each day has an AM session and a PM session. Each session is 4 hours.</p>
+    </header>
+
+    <section>
+      <h2>Day-to-day timesheet</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Session</th>
+            <th>Employee</th>
+            <th>Dept</th>
+            <th>Cost centre</th>
+            <th>Project</th>
+            <th class="num">Hours</th>
+            <th class="num">Rate</th>
+          </tr>
+        </thead>
+        <tbody id="timesheet"></tbody>
+      </table>
+      <button id="calculate" type="button">Calculate payroll</button>
+    </section>
+
+    <section>
+      <h2>Payroll by project</h2>
+      <p id="payroll-waiting" class="waiting">Click Calculate payroll to see pay by project.</p>
+      <p id="success" class="success hidden"></p>
+      <table id="payroll-table" class="hidden">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Session</th>
+            <th>Employee</th>
+            <th>Project</th>
+            <th class="num">Hours</th>
+            <th class="num">Pay</th>
+          </tr>
+        </thead>
+        <tbody id="payroll"></tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Project cost summary</h2>
+      <p id="summary-waiting" class="waiting">Click Calculate payroll to see pay by project.</p>
+      <table id="summary-table" class="hidden">
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th class="num">Sessions</th>
+            <th class="num">Total hours</th>
+            <th class="num">Total pay</th>
+          </tr>
+        </thead>
+        <tbody id="summary"></tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Needs attention</h2>
+      <p id="flag-waiting" class="waiting">Rows left out of the totals will show here after Calculate payroll.</p>
+      <div id="flags"></div>
+    </section>
+  </main>
+
+  <script>
+    var employees = [
+      { id: "E001", name: "Alex Chen", department: "Finance", costCentre: "CC-FIN", hourlyRate: 200 },
+      { id: "E002", name: "Mei Wong", department: "Engineering", costCentre: "CC-ENG", hourlyRate: 250 },
+      { id: "E003", name: "Sam Lee", department: "Engineering", costCentre: "CC-ENG", hourlyRate: 220 },
+      { id: "E004", name: "Jo Patel", department: "Operations", costCentre: "CC-OPS", hourlyRate: 180 }
+    ];
+
+    var timesheet = [
+      { row: 1, date: "6 Oct 2026", session: "AM", employeeId: "E001", projectCode: "P-Alpha" },
+      { row: 2, date: "6 Oct 2026", session: "PM", employeeId: "E002", projectCode: "P-Alpha" },
+      { row: 3, date: "7 Oct 2026", session: "AM", employeeId: "E002", projectCode: "P-Beta" },
+      { row: 4, date: "7 Oct 2026", session: "PM", employeeId: "E003", projectCode: "P-Beta" },
+      { row: 5, date: "8 Oct 2026", session: "AM", employeeId: "E004", projectCode: "P-Alpha" },
+      { row: 6, date: "8 Oct 2026", session: "PM", employeeId: "E003", projectCode: "" }
+    ];
+
+    var SESSION_HOURS = 4;
+
+    function employeeById(id) {
+      for (var i = 0; i < employees.length; i++) {
+        if (employees[i].id === id) return employees[i];
+      }
+      return null;
+    }
+
+    function money(amount) {
+      return amount.toLocaleString("en-GB");
+    }
+
+    function renderTimesheet() {
+      var body = document.getElementById("timesheet");
+      timesheet.forEach(function (row) {
+        var person = employeeById(row.employeeId);
+        var tr = document.createElement("tr");
+        if (!row.projectCode) tr.className = "flagged";
+        tr.innerHTML =
+          "<td>" + row.date + "</td>" +
+          "<td>" + row.session + "</td>" +
+          "<td>" + person.name + "</td>" +
+          "<td>" + person.department + "</td>" +
+          "<td>" + person.costCentre + "</td>" +
+          "<td>" + (row.projectCode || "—") + "</td>" +
+          "<td class=\"num\">" + SESSION_HOURS + "</td>" +
+          "<td class=\"num\">" + money(person.hourlyRate) + "</td>";
+        body.appendChild(tr);
+      });
+    }
+
+    function calculate() {
+      var payrollBody = document.getElementById("payroll");
+      var summaryBody = document.getElementById("summary");
+      var flags = document.getElementById("flags");
+      payrollBody.innerHTML = "";
+      summaryBody.innerHTML = "";
+      flags.innerHTML = "";
+
+      var projects = {};
+      var projectOrder = [];
+
+      timesheet.forEach(function (row) {
+        var person = employeeById(row.employeeId);
+        if (!row.projectCode) {
+          var note = document.createElement("p");
+          note.className = "flag-note";
+          note.textContent = row.date + " " + row.session + ", " + person.name +
+            ": add a project code. These " + SESSION_HOURS + " hours are not in the totals.";
+          flags.appendChild(note);
+          return;
+        }
+
+        var pay = SESSION_HOURS * person.hourlyRate;
+        var tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" + row.date + "</td>" +
+          "<td>" + row.session + "</td>" +
+          "<td>" + person.name + "</td>" +
+          "<td>" + row.projectCode + "</td>" +
+          "<td class=\"num\">" + SESSION_HOURS + "</td>" +
+          "<td class=\"num\">" + money(pay) + "</td>";
+        payrollBody.appendChild(tr);
+
+        if (!projects[row.projectCode]) {
+          projects[row.projectCode] = { sessions: 0, hours: 0, pay: 0 };
+          projectOrder.push(row.projectCode);
+        }
+        projects[row.projectCode].sessions += 1;
+        projects[row.projectCode].hours += SESSION_HOURS;
+        projects[row.projectCode].pay += pay;
+      });
+
+      projectOrder.forEach(function (code) {
+        var item = projects[code];
+        var tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" + code + "</td>" +
+          "<td class=\"num\">" + item.sessions + "</td>" +
+          "<td class=\"num\">" + item.hours + "</td>" +
+          "<td class=\"num\">" + money(item.pay) + "</td>";
+        summaryBody.appendChild(tr);
+      });
+
+      document.getElementById("payroll-waiting").classList.add("hidden");
+      document.getElementById("summary-waiting").classList.add("hidden");
+      document.getElementById("flag-waiting").classList.add("hidden");
+      document.getElementById("payroll-table").classList.remove("hidden");
+      document.getElementById("summary-table").classList.remove("hidden");
+
+      var success = document.getElementById("success");
+      success.textContent = "Payroll calculated for " + projectOrder.length + " projects.";
+      success.classList.remove("hidden");
+      document.getElementById("calculate").disabled = true;
+    }
+
+    renderTimesheet();
+    document.getElementById("calculate").addEventListener("click", calculate);
+  </script>
+</body>
+</html>
