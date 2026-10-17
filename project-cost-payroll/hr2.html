@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HR2 — Salary &amp; Calculate | Project Cost Payroll</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+  <main>
+    <header class="hero" style="background:linear-gradient(135deg,#6b4e12 0%,#b8860b 48%,#e8c547 120%);">
+      <div class="brand-mark">HR2 only · Salary stays on this page</div>
+      <h1>Salary import &amp; cost calculate</h1>
+      <p class="sub" id="periodSub">Import HR1 Staff Check Summary + Pay History column Y → Calculate → Excel reports</p>
+      <div class="role-bar">
+        <span class="badge">Signed in as HR2</span>
+        <a class="btn btn-secondary btn-small" href="index.html" id="linkBack" style="background:rgba(255,255,255,0.12);color:#fff;border-color:rgba(255,255,255,0.25);text-decoration:none;">Back to role select</a>
+        <button type="button" class="btn btn-secondary btn-small" id="btnLockHr2" style="background:rgba(255,255,255,0.12);color:#fff;border-color:rgba(255,255,255,0.25);">Lock HR2 (logout)</button>
+        <button type="button" class="btn btn-secondary btn-small" id="btnClearSaved" style="background:rgba(255,255,255,0.12);color:#fff;border-color:rgba(255,255,255,0.25);">Clear saved data</button>
+      </div>
+      <p class="switch-note">Password-protected. Timesheet read-only from HR1 file. Data remembered in this browser.</p>
+    </header>
+
+    <div class="rights-strip">
+      <div class="rights-box hr1" style="opacity:0.55;">
+        <strong>HR2 cannot</strong>
+        Edit timesheet units. Timesheet comes only from HR1 Staff Check Summary .xlsx.
+      </div>
+      <div class="rights-box hr2">
+        <strong>HR2 can</strong>
+        Import Staff Check + salary Y, calculate, download Salary (Actual) and Project Analysis.
+      </div>
+    </div>
+
+    <section>
+      <h2>Period (from Staff Check file)</h2>
+      <div class="toolbar period-bar">
+        <label>Year <select id="selYear" disabled></select></label>
+        <label>Month <select id="selMonth" disabled></select></label>
+        <span class="base-pill" id="basePill">Base: —</span>
+        <span class="hint" id="daysHint" style="margin:0;">Import Staff Check first</span>
+      </div>
+      <div class="rule">
+        Cost = (project units ÷ denom) × <strong>Pay History column Y</strong> (Net + EE + ER).
+        Denom and units come from HR1’s Staff Check Summary — not editable here.
+      </div>
+    </section>
+
+    <section>
+      <h2>1. Import Staff Check Summary from HR1</h2>
+      <p class="hint">Upload the .xlsx HR1 downloaded (sheet “Staff Check Summary”). No salary in that file.</p>
+      <div class="actions">
+        <label class="btn btn-small" style="cursor:pointer;">
+          Upload Staff Check Summary .xlsx
+          <input type="file" id="fileStaffCheck" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
+        </label>
+        <p class="status" id="importTsStatus">Waiting for Staff Check file…</p>
+      </div>
+      <p class="counts" id="importCounts">No timesheet imported yet.</p>
+      <div class="matrix-wrap" style="max-height:260px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Staff ID</th><th>Name</th><th>Department</th>
+              <th class="num">Denom</th><th class="num">Project units</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="tsReadonlyBody"><tr><td colspan="6" class="hint">Import Staff Check Summary to see timesheet (read-only).</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. Import salary (column Y)</h2>
+      <p class="hint">CSV header: <code>Staff ID,Net + EE + ER</code> — use <code>dummy_salary_list.csv</code> for testing. Never share this with HR1.</p>
+      <textarea id="pasteSalary" placeholder="Staff ID,Net + EE + ER&#10;H 250401,29000"></textarea>
+      <div class="actions">
+        <label class="btn btn-secondary btn-small" style="cursor:pointer;">
+          Upload salary .csv
+          <input type="file" id="fileSalary" accept=".csv,.txt,text/csv,text/plain" hidden />
+        </label>
+        <button type="button" class="btn btn-small" id="btnImportSalary">Import Y amounts</button>
+        <p class="status" id="salaryStatus">Import Staff Check first, then salary.</p>
+      </div>
+      <div class="matrix-wrap" style="max-height:260px;margin-top:10px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Staff ID</th><th>Employee Name</th><th>Department</th>
+              <th class="num">Y: Net + EE + ER (HKD)</th>
+            </tr>
+          </thead>
+          <tbody id="salaryBody"><tr><td colspan="4" class="hint">No salary loaded.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Calculate &amp; export</h2>
+      <div id="hr2Alert" class="alert"></div>
+      <div class="actions">
+        <button type="button" class="btn" id="btnCalculate">Calculate project cost</button>
+        <button type="button" class="btn btn-secondary" id="btnExportSalaryActual">Download Salary (Actual) Result (Excel)</button>
+        <button type="button" class="btn btn-secondary" id="btnExportCombined">Download Project Analysis (Excel)</button>
+        <p class="status" id="hr2Status">Import both files, then Calculate.</p>
+      </div>
+      <h3>Salary (Actual) style result</h3>
+      <div id="resultArea" class="locked-panel">Not calculated yet.</div>
+      <div id="denomNotes" class="hint" style="margin-top:12px;"></div>
+    </section>
+
+    <footer>
+      Keep hr2.html and salary files on the HR2 workstation only.
+      HR1 should only receive / produce Staff Check Summary (no Y).
+    </footer>
+  </main>
+
+  <script src="xlsx.full.min.js"></script>
+  <script src="shared.js"></script>
+  <script>
+    const {
+      MONTH_NAMES, daysInMonth, monthBase, monthAbbrev, periodLabel, fileStamp,
+      analysisSheetName, staffStatus, escapeHtml, money, parseCsv, headerIndex,
+      downloadExcel, downloadExcelMulti, readFileAsArrayBuffer, readFileAsText,
+      parseStaffCheckWorkbook, fillPeriodSelects,
+      isHr2Unlocked, unlockHr2, lockHr2, saveJson, loadJson, clearJson, HR2_STORE
+    } = PCP;
+
+    // Gate: HR2 page only after unlock from index.html (no salary leak via prompt bypass)
+    if (!isHr2Unlocked()) {
+      location.replace("index.html?need=hr2");
+      throw new Error("HR2 auth required");
+    }
+
+    let periodYear = 2026;
+    let periodMonth = 8;
+    let projects = [];
+    let staff = [];
+    let lastResult = null;
+    let staffCheckLoaded = false;
+
+    function persistHr2() {
+      saveJson(HR2_STORE, {
+        periodYear, periodMonth, projects, staff, staffCheckLoaded,
+        lastResult: lastResult || null
+      });
+    }
+
+    function restoreHr2() {
+      const s = loadJson(HR2_STORE);
+      if (!s || !Array.isArray(s.staff) || !s.staffCheckLoaded) return false;
+      periodYear = Number(s.periodYear) || periodYear;
+      periodMonth = Number(s.periodMonth) || periodMonth;
+      projects = Array.isArray(s.projects) ? s.projects : [];
+      staff = s.staff;
+      staffCheckLoaded = !!s.staffCheckLoaded;
+      lastResult = s.lastResult || null;
+      return true;
+    }
+
+    function updatePeriodUI() {
+      const days = daysInMonth(periodYear, periodMonth);
+      const base = monthBase(periodYear, periodMonth);
+      document.getElementById("selYear").value = String(periodYear);
+      document.getElementById("selMonth").value = String(periodMonth);
+      document.getElementById("basePill").textContent = "Base: " + base;
+      document.getElementById("daysHint").textContent = days + " days × 2 (from Staff Check)";
+      document.getElementById("periodSub").textContent =
+        periodLabel(periodYear, periodMonth) + " · Salary on HR2 only · Timesheet from HR1 file";
+    }
+
+    function showAlert(msg) {
+      const el = document.getElementById("hr2Alert");
+      if (!msg) { el.classList.remove("show"); el.textContent = ""; return; }
+      el.textContent = msg;
+      el.classList.add("show");
+    }
+
+    function renderTimesheetReadonly() {
+      const body = document.getElementById("tsReadonlyBody");
+      if (!staff.length) {
+        body.innerHTML = '<tr><td colspan="6" class="hint">Import Staff Check Summary to see timesheet (read-only).</td></tr>';
+        persistHr2();
+        return;
+      }
+      body.innerHTML = staff.map((p) => {
+        const st = staffStatus(p, projects, periodYear, periodMonth);
+        return `<tr class="${st.ok ? "" : "error-row"}">
+          <td>${escapeHtml(p.staffId)}</td>
+          <td>${escapeHtml(p.name)}</td>
+          <td>${escapeHtml(p.department)}</td>
+          <td class="num">${st.denom}</td>
+          <td class="num">${st.pUnits}</td>
+          <td>${st.ok ? "OK" : "ERROR"}</td>
+        </tr>`;
+      }).join("");
+      document.getElementById("importCounts").textContent =
+        "Imported " + staff.length + " staff · " + projects.length + " projects · read-only";
+      persistHr2();
+    }
+
+    function renderSalary() {
+      const body = document.getElementById("salaryBody");
+      if (!staff.length) {
+        body.innerHTML = '<tr><td colspan="4" class="hint">Import Staff Check first.</td></tr>';
+        return;
+      }
+      body.innerHTML = staff.map((p, idx) => `
+        <tr>
+          <td>${escapeHtml(p.staffId)}</td>
+          <td>${escapeHtml(p.name)}</td>
+          <td>${escapeHtml(p.department)}</td>
+          <td class="num"><input type="number" min="0" step="1" data-y="${idx}" value="${Number(p.y) || 0}" /></td>
+        </tr>
+      `).join("");
+      body.querySelectorAll("input[data-y]").forEach((el) => {
+        el.addEventListener("change", () => {
+          staff[Number(el.dataset.y)].y = Number(el.value) || 0;
+          lastResult = null;
+          persistHr2();
+          renderResult();
+        });
+      });
+      persistHr2();
+    }
+
+    function departments() {
+      return Array.from(new Set(staff.map((s) => s.department).filter(Boolean))).sort();
+    }
+
+    function validationIssues() {
+      return staff.map((p) => ({ person: p, st: staffStatus(p, projects, periodYear, periodMonth) }))
+        .filter((x) => !x.st.ok);
+    }
+
+    function calculate() {
+      if (!staffCheckLoaded) throw new Error("Import Staff Check Summary from HR1 first.");
+      const issues = validationIssues();
+      if (issues.length) {
+        throw new Error(issues.length + " staff fail denom = project units in the Staff Check file. Ask HR1 to fix and re-export.");
+      }
+      const missingY = staff.filter((p) => !(Number(p.y) > 0) && staffStatus(p, projects, periodYear, periodMonth).pUnits > 0);
+      if (missingY.length) {
+        throw new Error(missingY.length + " staff with project units have Y = 0. Import salary CSV.");
+      }
+      const depts = departments();
+      const matrix = {};
+      projects.forEach((p) => {
+        matrix[p.id] = {};
+        depts.forEach((d) => { matrix[p.id][d] = 0; });
+      });
+      const notes = [];
+      staff.forEach((person) => {
+        const st = staffStatus(person, projects, periodYear, periodMonth);
+        const y = Number(person.y) || 0;
+        notes.push({
+          name: person.name, base: st.base, leave: st.leave, denom: st.denom,
+          projectUnits: st.pUnits, y, edge: st.pUnits === 0
+        });
+        if (st.denom <= 0 || st.pUnits === 0) return;
+        projects.forEach((p) => {
+          const units = Number(person.projects[p.id]) || 0;
+          if (units <= 0) return;
+          matrix[p.id][person.department] =
+            (matrix[p.id][person.department] || 0) + (units / st.denom) * y;
+        });
+      });
+      lastResult = { matrix, notes, depts };
+      persistHr2();
+      return lastResult;
+    }
+
+    function renderResult() {
+      const area = document.getElementById("resultArea");
+      const notesEl = document.getElementById("denomNotes");
+      if (!lastResult) {
+        area.className = "locked-panel";
+        area.textContent = "Not calculated yet.";
+        notesEl.textContent = "";
+        return;
+      }
+      const { matrix, notes, depts } = lastResult;
+      const colTotals = {};
+      depts.forEach((d) => { colTotals[d] = 0; });
+      let grand = 0;
+      const rows = projects.map((p) => {
+        let rowTotal = 0;
+        const cells = depts.map((d) => {
+          const v = matrix[p.id][d] || 0;
+          rowTotal += v;
+          colTotals[d] += v;
+          return `<td class="num">${v.toLocaleString("en-HK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+        }).join("");
+        grand += rowTotal;
+        return `<tr><td>${escapeHtml(p.name)}</td>${cells}
+          <td class="num"><strong>${rowTotal.toLocaleString("en-HK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td></tr>`;
+      }).join("");
+      area.className = "matrix-wrap";
+      area.style.maxHeight = "480px";
+      area.innerHTML = `<table>
+        <thead><tr><th>Project Name</th>${depts.map((d) => `<th class="num">${escapeHtml(d)}</th>`).join("")}<th class="num">Total</th></tr></thead>
+        <tbody>${rows}
+          <tr><td><strong>Total</strong></td>
+          ${depts.map((d) => `<td class="num"><strong>${colTotals[d].toLocaleString("en-HK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>`).join("")}
+          <td class="num"><strong>${grand.toLocaleString("en-HK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td></tr>
+        </tbody></table>`;
+      notesEl.innerHTML = notes.slice(0, 20).map((n) => {
+        const edge = n.edge ? " · edge (0 units → HKD 0)" : "";
+        return `${escapeHtml(n.name)}: denom ${n.denom} = units ${n.projectUnits}; Y ${money(n.y)}${edge}`;
+      }).join("<br />") + (notes.length > 20 ? "<br />… +" + (notes.length - 20) + " more" : "");
+    }
+
+    function buildSalaryActualRows() {
+      const { matrix, depts } = lastResult;
+      const header = ["Project Name", ...depts, "Total"];
+      const rows = [header];
+      const colTotals = {};
+      depts.forEach((d) => { colTotals[d] = 0; });
+      let grand = 0;
+      projects.forEach((p) => {
+        let rowTotal = 0;
+        const cells = depts.map((d) => {
+          const v = Number(matrix[p.id]?.[d]) || 0;
+          rowTotal += v;
+          colTotals[d] += v;
+          return Math.round(v * 100) / 100;
+        });
+        grand += rowTotal;
+        rows.push([p.name, ...cells, Math.round(rowTotal * 100) / 100]);
+      });
+      rows.push(["Total", ...depts.map((d) => Math.round(colTotals[d] * 100) / 100), Math.round(grand * 100) / 100]);
+      return rows;
+    }
+
+    function exportSalaryActual() {
+      if (!lastResult) throw new Error("Calculate first.");
+      downloadExcel(
+        "Salary_Actual_Result_" + fileStamp(periodYear, periodMonth) + ".xlsx",
+        "Salary Actual",
+        [[periodLabel(periodYear, periodMonth)], ...buildSalaryActualRows()]
+      );
+    }
+
+    function exportProjectAnalysis() {
+      if (!lastResult) throw new Error("Calculate first.");
+      const mon = monthAbbrev(periodMonth);
+      const code = analysisSheetName(periodYear, periodMonth);
+      const projNames = projects.map((p) => p.name);
+      const shareRows = [["Month", "Name", ...projNames]];
+      const costRows = [["Month", "Name", ...projNames]];
+      const shareColSum = projects.map(() => 0);
+      const costColSum = projects.map(() => 0);
+      staff.forEach((person) => {
+        const st = staffStatus(person, projects, periodYear, periodMonth);
+        const y = Number(person.y) || 0;
+        const shareRow = [mon, person.name];
+        const costRow = [mon, person.name];
+        projects.forEach((p, i) => {
+          const units = Number(person.projects[p.id]) || 0;
+          if (st.denom > 0 && units > 0) {
+            const share = units / st.denom;
+            shareRow.push(Math.round(share * 1e10) / 1e10);
+            shareColSum[i] += share;
+            if (y > 0) {
+              const costR = Math.round(share * y * 100) / 100;
+              costRow.push(costR);
+              costColSum[i] += costR;
+            } else costRow.push("");
+          } else {
+            shareRow.push("");
+            costRow.push("");
+          }
+        });
+        shareRows.push(shareRow);
+        costRows.push(costRow);
+      });
+      shareRows.push(["", "", ...shareColSum.map((v) => Math.round(v * 1e10) / 1e10)]);
+      costRows.push(["", "", ...costColSum.map((v) => Math.round(v * 100) / 100)]);
+      downloadExcelMulti("Project_Analysis_" + fileStamp(periodYear, periodMonth) + ".xlsx", [
+        { name: code, rows: shareRows },
+        { name: code + " Cost", rows: costRows }
+      ]);
+    }
+
+    function importSalary(text) {
+      if (!staffCheckLoaded) throw new Error("Import Staff Check Summary first.");
+      const rows = parseCsv(text);
+      if (rows.length < 2) throw new Error("Salary CSV needs header + data.");
+      const h = rows[0];
+      const iId = headerIndex(h, ["staff id", "staffid", "id"]);
+      const iY = headerIndex(h, ["net + ee + er", "y", "net+ee+er", "column y", "amount"]);
+      if (iId < 0 || iY < 0) throw new Error("Need Staff ID and Net + EE + ER (or Y).");
+      let updated = 0;
+      const missing = [];
+      rows.slice(1).forEach((r) => {
+        const sid = String(r[iId] || "").trim();
+        const person = staff.find((s) => s.staffId.toLowerCase() === sid.toLowerCase());
+        if (!person) { if (sid) missing.push(sid); return; }
+        person.y = Number(r[iY]) || 0;
+        updated++;
+      });
+      lastResult = null;
+      let msg = "Updated Y for " + updated + " staff.";
+      if (missing.length) msg += " Unknown IDs: " + missing.slice(0, 5).join(", ") + (missing.length > 5 ? "…" : "") + ".";
+      return msg;
+    }
+
+    fillPeriodSelects(
+      document.getElementById("selYear"),
+      document.getElementById("selMonth"),
+      periodYear,
+      periodMonth,
+      () => {}
+    );
+    updatePeriodUI();
+
+    document.getElementById("btnLockHr2").onclick = () => {
+      lockHr2();
+      location.href = "index.html";
+    };
+    document.getElementById("btnClearSaved").onclick = () => {
+      if (!confirm("Clear all saved HR2 data (Staff Check + salary) in this browser?")) return;
+      clearJson(HR2_STORE);
+      projects = [];
+      staff = [];
+      lastResult = null;
+      staffCheckLoaded = false;
+      document.getElementById("importTsStatus").textContent = "Saved data cleared.";
+      document.getElementById("importTsStatus").className = "status warn";
+      document.getElementById("salaryStatus").textContent = "Import Staff Check first, then salary.";
+      document.getElementById("salaryStatus").className = "status";
+      renderTimesheetReadonly();
+      renderSalary();
+      renderResult();
+    };
+
+    if (restoreHr2()) {
+      updatePeriodUI();
+      renderTimesheetReadonly();
+      renderSalary();
+      renderResult();
+      document.getElementById("importTsStatus").textContent =
+        "Restored last HR2 session (" + staff.length + " staff).";
+      document.getElementById("importTsStatus").className = "status ok";
+      document.getElementById("salaryStatus").textContent = "Salary values restored from this browser.";
+      document.getElementById("salaryStatus").className = "status ok";
+    }
+
+    document.getElementById("fileStaffCheck").onchange = async (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      try {
+        const buf = await readFileAsArrayBuffer(f);
+        const parsed = parseStaffCheckWorkbook(buf);
+        periodYear = parsed.year;
+        periodMonth = parsed.month;
+        projects = parsed.projects;
+        staff = parsed.staff.map((p) => ({ ...p, y: 0 }));
+        staffCheckLoaded = true;
+        lastResult = null;
+        updatePeriodUI();
+        renderTimesheetReadonly();
+        renderSalary();
+        renderResult();
+        const issues = validationIssues();
+        document.getElementById("importTsStatus").textContent =
+          "Loaded Staff Check: " + staff.length + " staff, " + projects.length + " projects.";
+        document.getElementById("importTsStatus").className = "status ok";
+        if (issues.length) {
+          showAlert(issues.length + " denom errors in HR1 file. Ask HR1 to fix and re-export.");
+        } else showAlert("");
+      } catch (err) {
+        document.getElementById("importTsStatus").textContent = err.message;
+        document.getElementById("importTsStatus").className = "status err";
+      }
+    };
+
+    document.getElementById("btnImportSalary").onclick = () => {
+      try {
+        const msg = importSalary(document.getElementById("pasteSalary").value);
+        document.getElementById("salaryStatus").textContent = msg;
+        document.getElementById("salaryStatus").className = "status ok";
+        renderSalary();
+        renderResult();
+      } catch (e) {
+        document.getElementById("salaryStatus").textContent = e.message;
+        document.getElementById("salaryStatus").className = "status err";
+      }
+    };
+    document.getElementById("fileSalary").onchange = async (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      document.getElementById("pasteSalary").value = await readFileAsText(f);
+      document.getElementById("btnImportSalary").click();
+    };
+    document.getElementById("btnCalculate").onclick = () => {
+      try {
+        calculate();
+        renderResult();
+        document.getElementById("hr2Status").textContent =
+          "Calculation complete for " + periodLabel(periodYear, periodMonth) + ".";
+        document.getElementById("hr2Status").className = "status ok";
+        showAlert("");
+      } catch (e) {
+        document.getElementById("hr2Status").textContent = e.message;
+        document.getElementById("hr2Status").className = "status err";
+        showAlert(e.message);
+      }
+    };
+    document.getElementById("btnExportSalaryActual").onclick = () => {
+      try {
+        exportSalaryActual();
+        document.getElementById("hr2Status").textContent = "Downloaded Salary (Actual) Result.";
+        document.getElementById("hr2Status").className = "status ok";
+      } catch (e) {
+        document.getElementById("hr2Status").textContent = e.message;
+        document.getElementById("hr2Status").className = "status err";
+      }
+    };
+    document.getElementById("btnExportCombined").onclick = () => {
+      try {
+        exportProjectAnalysis();
+        document.getElementById("hr2Status").textContent = "Downloaded Project Analysis.";
+        document.getElementById("hr2Status").className = "status ok";
+      } catch (e) {
+        document.getElementById("hr2Status").textContent = e.message;
+        document.getElementById("hr2Status").className = "status err";
+      }
+    };
+  </script>
+</body>
+</html>
