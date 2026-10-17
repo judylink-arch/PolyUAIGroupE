@@ -6,7 +6,348 @@
     "July", "August", "September", "October", "November", "December"
   ];
   const STAFF_CHECK_SHEET = "Staff Check Summary";
+  const STAFF_TS_SHEET = "Staff Timesheet";
+  const STAFF_DAILY_SHEET = "Daily Entries";
   const UNITS_PREFIX = "Units: ";
+
+  /** Quad-Tech style codes: half-day (AM or PM) = 1 unit. Base = days × 2. */
+  const DEFAULT_PROJECT_CODES = [
+    { code: "2107EM20M", label: "Eastern Harbour Tunnel" },
+    { code: "2656EM20M", label: "Hotung Secondary School" },
+    { code: "3083EM20M", label: "Hong Kong Children's Hospital" },
+    { code: "2435EM21M", label: "學校 Project" },
+    { code: "1497EM22M", label: "Shatin Hospital" },
+    { code: "1611EM22M", label: "North Lantau Hospital" },
+    { code: "1865EM22M", label: "學校 Project" },
+    { code: "1735EM22W", label: "New Territories West" },
+    { code: "元朗宏業西街", label: "元朗宏業西街" },
+    { code: "Kai Tak 1B2", label: "Kai Tak 1B2" },
+    { code: "Tsat Sing Kong", label: "Tsat Sing Kong" },
+    { code: "焚化爐（MVAC & ELV）", label: "焚化爐（MVAC & ELV）" },
+    { code: "Kai Tak 1B3", label: "Kai Tak 1B3" },
+    { code: "GDS KC1", label: "GDS KC1" },
+    { code: "GDS KC2", label: "GDS KC2" },
+    { code: "EMSD Tender", label: "EMSD Tender" },
+    { code: "General Tendering", label: "General Tendering" }
+  ];
+
+  function projectDisplayName(code, label) {
+    const c = String(code || "").trim();
+    const l = String(label || "").trim();
+    if (!c) return l;
+    if (!l || l.toLowerCase() === c.toLowerCase()) return c;
+    return c + " — " + l;
+  }
+
+  function defaultProjects() {
+    return DEFAULT_PROJECT_CODES.map((p, i) => ({
+      id: "QP" + (i + 1),
+      name: projectDisplayName(p.code, p.label),
+      code: p.code
+    }));
+  }
+
+  function isLeaveCode(code) {
+    const c = String(code || "").trim();
+    return LEAVE_CODES.some((x) => x.toLowerCase() === c.toLowerCase());
+  }
+
+  function normalizeSlotCode(raw) {
+    const s = String(raw == null ? "" : raw).trim();
+    if (!s) return "";
+    const leaveHit = LEAVE_CODES.find((c) => c.toLowerCase() === s.toLowerCase());
+    if (leaveHit) return leaveHit;
+    return s;
+  }
+
+  /**
+   * Aggregate AM/PM day slots into leave + project unit maps.
+   * days: [{ date, am, pm }] — each non-empty slot = 1 unit.
+   */
+  function aggregateDaySlots(days, projectList) {
+    const leave = emptyLeave();
+    const byCode = {};
+    const codeToProject = {};
+    (projectList || []).forEach((p) => {
+      const code = String(p.code || p.name || "").trim();
+      if (code) codeToProject[code.toLowerCase()] = p;
+      // also match display name prefix before " — "
+      const name = String(p.name || "").trim();
+      if (name) codeToProject[name.toLowerCase()] = p;
+      const dash = name.indexOf(" — ");
+      if (dash > 0) codeToProject[name.slice(0, dash).toLowerCase()] = p;
+    });
+
+    (days || []).forEach((d) => {
+      [d.am, d.pm].forEach((raw) => {
+        const code = normalizeSlotCode(raw);
+        if (!code) return;
+        if (isLeaveCode(code)) {
+          leave[code] = (leave[code] || 0) + 1;
+          return;
+        }
+        byCode[code] = (byCode[code] || 0) + 1;
+      });
+    });
+
+    const projectsOut = [];
+    const projMap = {};
+    Object.keys(byCode).forEach((code, i) => {
+      const known = codeToProject[code.toLowerCase()];
+      const id = known ? known.id : ("AUTO" + (i + 1));
+      const name = known ? known.name : code;
+      if (!projectsOut.find((p) => p.id === id)) {
+        projectsOut.push({ id, name, code: known ? (known.code || code) : code });
+      }
+      projMap[id] = (projMap[id] || 0) + byCode[code];
+    });
+
+    return { leave, projects: projectsOut, projectUnits: projMap, codeUnits: byCode };
+  }
+
+  function monthAbbrevFromAny(text) {
+    const t = String(text || "").trim().toLowerCase();
+    if (!t) return 0;
+    const short = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+    const si = short.indexOf(t.slice(0, 3));
+    if (si >= 0) return si + 1;
+    const mi = MONTH_NAMES.findIndex((n) => n.toLowerCase() === t);
+    return mi >= 0 ? mi + 1 : 0;
+  }
+
+  /** Build downloadable staff submission: summary + daily AM/PM rows */
+  function buildStaffSubmissionSheets(person, projects, year, month, days) {
+    const st = staffStatus(person, projects, year, month);
+    const summary = [
+      [
+        "Period", "Staff ID", "Employee Name", "Department",
+        ...LEAVE_CODES,
+        "Leave total", "Base", "Denom", "Project units", "Status",
+        ...projects.map((p) => UNITS_PREFIX + p.name)
+      ],
+      [
+        periodLabel(year, month),
+        person.staffId,
+        person.name,
+        person.department || "",
+        ...LEAVE_CODES.map((c) => Number(person.leave[c]) || 0),
+        st.leave,
+        st.base,
+        st.denom,
+        st.pUnits,
+        st.ok ? "OK" : "ERROR: denom <> project units",
+        ...projects.map((p) => Number(person.projects[p.id]) || 0)
+      ]
+    ];
+    const daily = [["Date", "Day", "AM", "PM"]];
+    (days || []).forEach((d) => {
+      daily.push([
+        d.date || "",
+        d.day || "",
+        normalizeSlotCode(d.am) || "",
+        normalizeSlotCode(d.pm) || ""
+      ]);
+    });
+    return [
+      { name: STAFF_TS_SHEET, rows: summary },
+      { name: STAFF_DAILY_SHEET, rows: daily }
+    ];
+  }
+
+  function cellStr(aoa, r, c) {
+    if (!aoa[r]) return "";
+    const v = aoa[r][c];
+    return v == null ? "" : String(v).trim();
+  }
+
+  function excelSerialToDate(n) {
+    // Excel serial (Windows) → JS Date
+    const ms = Math.round((Number(n) - 25569) * 86400 * 1000);
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  function formatYmd(d) {
+    if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "";
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  function weekdayShort(d) {
+    return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()];
+  }
+
+  /**
+   * Parse staff HTML export (.xlsx with Staff Timesheet sheet)
+   * or a one-row Staff Check style summary.
+   */
+  function parseStaffSubmissionWorkbook(arrayBuffer, hintProjects) {
+    ensureXlsx();
+    const wb = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
+    const names = wb.SheetNames || [];
+
+    // Prefer dedicated staff submission sheet; else Staff Check; else first
+    let sheetName = names.includes(STAFF_TS_SHEET)
+      ? STAFF_TS_SHEET
+      : (names.includes(STAFF_CHECK_SHEET) ? STAFF_CHECK_SHEET : names[0]);
+    if (!sheetName) throw new Error("Workbook has no sheets.");
+
+    // Quad-Tech native template? (detect first; do not confuse with Staff Timesheet export)
+    try {
+      const qt = tryParseQuadTechWorkbook(wb, hintProjects);
+      if (qt) return qt;
+    } catch (e) {
+      const first = wb.Sheets[wb.SheetNames[0]];
+      const aoa0 = first ? XLSX.utils.sheet_to_json(first, { header: 1, defval: "" }) : [];
+      const title0 = String(aoa0[0]?.[0] || "");
+      if (/timesheet|工作時間/i.test(title0)) throw e;
+      // else fall through to Staff Timesheet / Staff Check parser
+    }
+
+    const parsed = parseStaffCheckWorkbook(arrayBuffer);
+    // Attach daily if present
+    if (names.includes(STAFF_DAILY_SHEET)) {
+      const dailyAoa = XLSX.utils.sheet_to_json(wb.Sheets[STAFF_DAILY_SHEET], { header: 1, defval: "" });
+      const days = [];
+      for (let r = 1; r < dailyAoa.length; r++) {
+        const row = dailyAoa[r];
+        if (!row || !row.length) continue;
+        const am = normalizeSlotCode(row[2]);
+        const pm = normalizeSlotCode(row[3]);
+        if (!am && !pm && !row[0]) continue;
+        days.push({ date: String(row[0] || ""), day: String(row[1] || ""), am, pm });
+      }
+      parsed.days = days;
+    }
+    parsed.source = "staff-submission";
+    return parsed;
+  }
+
+  /**
+   * Parse Quad-Tech Timesheet Excel (AM=col E, PM=col J, half-day = 1 unit).
+   * Returns null if not that format.
+   */
+  function tryParseQuadTechWorkbook(wb, hintProjects) {
+    const sheet = wb.Sheets[(wb.SheetNames || []).find((n) => /time\s*sheet/i.test(n)) || wb.SheetNames[0]];
+    if (!sheet) return null;
+    const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
+    if (!aoa.length) return null;
+    const title = cellStr(aoa, 0, 0);
+    if (!/timesheet|工作時間/i.test(title) && !cellStr(aoa, 2, 0).match(/NAME|姓名/i)) {
+      return null;
+    }
+    // Confirm AM/PM header row
+    let headerR = -1;
+    for (let r = 0; r < Math.min(12, aoa.length); r++) {
+      const e = cellStr(aoa, r, 4);
+      const j = cellStr(aoa, r, 9);
+      if (/09|AM|TIME/i.test(e) || e === "09 - 10") { headerR = r; break; }
+      if (/13:30|PM/i.test(j)) { headerR = r; break; }
+    }
+    if (headerR < 0) {
+      // still accept if NAME + MONTH present
+      if (!/NAME|姓名/i.test(cellStr(aoa, 2, 0))) return null;
+      headerR = 7; // Quad-Tech template default
+    }
+
+    let year = new Date().getFullYear();
+    let month = new Date().getMonth() + 1;
+    // Year often in row2 col16 like "/2023"
+    for (let c = 0; c < 20; c++) {
+      const yHit = String(aoa[1]?.[c] ?? "").match(/\/?(20\d{2})/);
+      if (yHit) { year = Number(yHit[1]); break; }
+    }
+    // Month in N3 (col 14 index 13)
+    for (let c = 12; c < 18; c++) {
+      const m = monthAbbrevFromAny(aoa[2]?.[c]);
+      if (m) { month = m; break; }
+    }
+
+    // Name / dept — cells to the right of labels (often empty in blank template)
+    let name = "";
+    let department = "";
+    let staffId = "";
+    for (let c = 1; c < 12; c++) {
+      const v = cellStr(aoa, 2, c);
+      if (v && !/NAME|姓名|MONTH|月份/i.test(v)) { name = v; break; }
+    }
+    for (let c = 13; c < 20; c++) {
+      const v = cellStr(aoa, 4, c);
+      if (v && !/DEPT|部門/i.test(v)) { department = v; break; }
+    }
+    // Optional Staff ID near position row
+    for (let c = 1; c < 12; c++) {
+      const v = cellStr(aoa, 4, c);
+      if (v && !/POSITION|職位/i.test(v)) {
+        if (/^H\s?\d+/i.test(v) || /staff/i.test(v)) staffId = v;
+        break;
+      }
+    }
+
+    const days = [];
+    const startR = headerR + 1;
+    for (let r = startR; r < Math.min(startR + 35, aoa.length); r++) {
+      const rawDate = aoa[r]?.[0];
+      let dateObj = null;
+      if (rawDate instanceof Date) dateObj = rawDate;
+      else if (typeof rawDate === "number") dateObj = excelSerialToDate(rawDate);
+      else if (rawDate) {
+        const tryD = new Date(rawDate);
+        if (!Number.isNaN(tryD.getTime())) dateObj = tryD;
+      }
+      // Stop at summary labels
+      const a0 = cellStr(aoa, r, 0);
+      if (/PRO\/JOB|ADMIN|Total|總/i.test(a0)) break;
+      if (!dateObj && !cellStr(aoa, r, 4) && !cellStr(aoa, r, 9)) continue;
+      if (!dateObj) continue;
+
+      const am = normalizeSlotCode(aoa[r][4]);
+      const pm = normalizeSlotCode(aoa[r][9]);
+      days.push({
+        date: formatYmd(dateObj),
+        day: cellStr(aoa, r, 3) || weekdayShort(dateObj),
+        am,
+        pm
+      });
+    }
+
+    if (!days.length) {
+      throw new Error("Quad-Tech timesheet found but no day rows with dates. Fill the month grid first.");
+    }
+
+    const baseProjects = (hintProjects && hintProjects.length) ? hintProjects : defaultProjects();
+    const agg = aggregateDaySlots(days, baseProjects);
+
+    // Union projects: known list + any new codes from file
+    const projects = [];
+    const seen = new Set();
+    baseProjects.forEach((p) => {
+      if (!seen.has(p.id)) { projects.push(p); seen.add(p.id); }
+    });
+    agg.projects.forEach((p) => {
+      if (!seen.has(p.id)) { projects.push(p); seen.add(p.id); }
+    });
+
+    const personProjects = {};
+    projects.forEach((p) => { personProjects[p.id] = Number(agg.projectUnits[p.id]) || 0; });
+
+    if (!name) name = "(Imported Quad-Tech — set name)";
+    if (!staffId) staffId = "QT-" + formatYmd(new Date()).replace(/-/g, "");
+
+    return {
+      year,
+      month,
+      projects,
+      staff: [{
+        staffId,
+        name,
+        department,
+        leave: agg.leave,
+        projects: personProjects
+      }],
+      days,
+      source: "quad-tech"
+    };
+  }
 
   function daysInMonth(year, month) {
     return new Date(year, month, 0).getDate();
@@ -366,7 +707,10 @@
     LEAVE_CODES,
     MONTH_NAMES,
     STAFF_CHECK_SHEET,
+    STAFF_TS_SHEET,
+    STAFF_DAILY_SHEET,
     UNITS_PREFIX,
+    DEFAULT_PROJECT_CODES,
     HR2_PASSWORD,
     AUTH_KEY,
     HR1_STORE,
@@ -397,6 +741,13 @@
     readFileAsText,
     buildStaffCheckRows,
     parseStaffCheckWorkbook,
+    parseStaffSubmissionWorkbook,
+    buildStaffSubmissionSheets,
+    aggregateDaySlots,
+    defaultProjects,
+    projectDisplayName,
+    isLeaveCode,
+    normalizeSlotCode,
     fillPeriodSelects
   };
 })(window);

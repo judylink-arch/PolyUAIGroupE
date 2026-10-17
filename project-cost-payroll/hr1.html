@@ -26,7 +26,7 @@
     <div class="rights-strip">
       <div class="rights-box hr1">
         <strong>HR1 can</strong>
-        Add projects &amp; staff, enter timesheet, check denom, download Staff Check Summary (.xlsx).
+        Import staff / Quad-Tech timesheets, add projects &amp; staff, check denom, download Staff Check Summary (.xlsx).
       </div>
       <div class="rights-box hr2" style="opacity:0.55;">
         <strong>HR1 cannot</strong>
@@ -107,7 +107,23 @@
       </div>
 
       <div class="import-card" style="margin-top:14px;">
-        <h4><span class="step">3</span> Enter timesheet (dropdown)</h4>
+        <h4><span class="step">3</span> Import staff timesheets (auto)</h4>
+        <p class="hint">
+          Staff fill <a href="staff.html">staff.html</a> (AM/PM half-days) and send you their .xlsx —
+          or upload the original Quad-Tech Timesheet Excel. Units are counted automatically (½ day = 1 unit).
+        </p>
+        <div class="actions">
+          <label class="btn btn-small" style="cursor:pointer;">
+            Upload staff timesheet(s) .xlsx
+            <input type="file" id="fileStaffTimesheets" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden />
+          </label>
+          <button type="button" class="btn btn-secondary btn-small" id="btnLoadQuadProjects">Load Quad-Tech project list</button>
+        </div>
+        <p class="status" id="staffTsImportStatus">Waiting for staff timesheet files…</p>
+      </div>
+
+      <div class="import-card" style="margin-top:14px;">
+        <h4><span class="step">4</span> Enter / adjust timesheet (dropdown)</h4>
         <p class="hint">Choose staff → leave units → project from list → units → Add / update. Use Fill remaining to match denom.</p>
         <div class="toolbar">
           <label>Staff <select id="tsStaffSelect" style="min-width:260px;"></select></label>
@@ -175,7 +191,8 @@
       LEAVE_CODES, monthBase, daysInMonth, periodLabel, fileStamp,
       emptyLeave, staffStatus, escapeHtml, parseCsv, headerIndex,
       downloadExcelMulti, buildStaffCheckRows, STAFF_CHECK_SHEET, fillPeriodSelects,
-      readFileAsText, saveJson, loadJson, HR1_STORE
+      readFileAsText, readFileAsArrayBuffer, saveJson, loadJson, HR1_STORE,
+      parseStaffSubmissionWorkbook, defaultProjects
     } = PCP;
 
     let periodYear = 2026;
@@ -478,6 +495,77 @@
       selectedStaffId = null;
     }
 
+    function ensureProject(name, code) {
+      const n = String(name || code || "").trim();
+      if (!n) return null;
+      let hit = projects.find((p) => p.name === n || (code && p.code === code) ||
+        (p.code && code && p.code.toLowerCase() === String(code).toLowerCase()) ||
+        p.name.toLowerCase() === n.toLowerCase());
+      if (hit) return hit;
+      hit = { id: "P" + (projectSeq++), name: n, code: code || "" };
+      projects.push(hit);
+      return hit;
+    }
+
+    function mergeImportedPerson(personIn, projectList) {
+      // Map incoming project units onto HR1 project ids
+      const mapped = {};
+      projects.forEach((p) => { mapped[p.id] = 0; });
+      (projectList || []).forEach((p) => {
+        const ensured = ensureProject(p.name, p.code);
+        if (!ensured) return;
+        mapped[ensured.id] = (mapped[ensured.id] || 0) + (Number(personIn.projects[p.id]) || 0);
+      });
+      const leave = { ...emptyLeave(), ...(personIn.leave || {}) };
+      const existing = staff.find((s) => s.staffId.toLowerCase() === String(personIn.staffId).toLowerCase());
+      if (existing) {
+        existing.name = personIn.name || existing.name;
+        existing.department = personIn.department || existing.department;
+        existing.leave = leave;
+        existing.projects = mapped;
+        return "updated";
+      }
+      staff.push({
+        staffId: personIn.staffId,
+        name: personIn.name,
+        department: personIn.department || "",
+        leave,
+        projects: mapped
+      });
+      return "added";
+    }
+
+    async function importStaffTimesheetFiles(fileList) {
+      const files = [...(fileList || [])];
+      if (!files.length) throw new Error("Choose one or more .xlsx files.");
+      let added = 0;
+      let updated = 0;
+      const notes = [];
+      for (const file of files) {
+        const buf = await readFileAsArrayBuffer(file);
+        const parsed = parseStaffSubmissionWorkbook(buf, projects.length ? projects : defaultProjects());
+        if (parsed.year && parsed.month) {
+          periodYear = parsed.year;
+          periodMonth = parsed.month;
+          document.getElementById("selYear").value = String(periodYear);
+          document.getElementById("selMonth").value = String(periodMonth);
+          updatePeriodUI();
+        }
+        (parsed.projects || []).forEach((p) => ensureProject(p.name, p.code));
+        syncProjectKeys();
+        (parsed.staff || []).forEach((person) => {
+          const action = mergeImportedPerson(person, parsed.projects);
+          if (action === "added") added++;
+          else updated++;
+        });
+        notes.push(file.name + " (" + (parsed.source || "file") + ")");
+      }
+      syncProjectKeys();
+      selectedStaffId = staff[0] && staff[0].staffId;
+      renderAll();
+      return { added, updated, notes };
+    }
+
     function loadDemo() {
       periodYear = 2026;
       periodMonth = 8;
@@ -677,6 +765,29 @@
       if (!f) return;
       document.getElementById("pasteStaff").value = await readFileAsText(f);
       document.getElementById("btnImportStaff").click();
+    };
+    document.getElementById("btnLoadQuadProjects").onclick = () => {
+      const base = defaultProjects();
+      base.forEach((p) => ensureProject(p.name, p.code));
+      syncProjectKeys();
+      renderAll();
+      document.getElementById("hr1Status").textContent = "Loaded " + projects.length + " Quad-Tech style projects.";
+      document.getElementById("hr1Status").className = "status ok";
+    };
+    document.getElementById("fileStaffTimesheets").onchange = async (e) => {
+      const el = document.getElementById("staffTsImportStatus");
+      try {
+        const result = await importStaffTimesheetFiles(e.target.files);
+        el.textContent = "Imported " + result.notes.length + " file(s): +" + result.added +
+          " staff, updated " + result.updated + ". " + result.notes.join("; ");
+        el.className = "status ok";
+        document.getElementById("hr1Status").textContent = el.textContent;
+        document.getElementById("hr1Status").className = "status ok";
+      } catch (err) {
+        el.textContent = err.message;
+        el.className = "status err";
+      }
+      e.target.value = "";
     };
     document.getElementById("btnClearSaved").onclick = () => {
       if (!confirm("Clear all saved HR1 timesheet data in this browser?")) return;

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Staff Timesheet Entry | Project Cost Payroll</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="shared.css" />
+  <style>
+    .day-grid select { min-width: 140px; max-width: 220px; }
+    .day-grid td.weekend { background: #f5edd6; }
+    .summary-pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+    .summary-pills span {
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fffaf0;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <div class="brand-mark">Staff · Daily timesheet (no salary)</div>
+      <h1>Enter your monthly timesheet</h1>
+      <p class="sub">Same rule as Quad-Tech Excel: each half-day (AM or PM) = 1 unit. Base = days × 2. Download the file and send it to HR1.</p>
+      <div class="role-bar">
+        <span class="badge">Staff entry</span>
+        <a class="btn btn-secondary btn-small" href="index.html" style="background:rgba(255,255,255,0.12);color:#fff;border-color:rgba(255,255,255,0.25);text-decoration:none;">Back to home</a>
+        <button type="button" class="btn btn-secondary btn-small" id="btnClearStaffLocal" style="background:rgba(255,255,255,0.12);color:#fff;border-color:rgba(255,255,255,0.25);">Clear saved draft</button>
+      </div>
+      <p class="switch-note">Fill AM / PM with leave code or project code. HR1 imports your Excel automatically.</p>
+    </header>
+
+    <section>
+      <h2>1. Your details &amp; period</h2>
+      <div class="toolbar">
+        <label>Year <select id="selYear"></select></label>
+        <label>Month <select id="selMonth"></select></label>
+        <span class="base-pill" id="basePill">Base: —</span>
+        <span class="hint" id="daysHint" style="margin:0;"></span>
+      </div>
+      <div class="toolbar">
+        <label>Staff ID <input type="text" id="staffId" placeholder="H 250401" /></label>
+        <label style="flex:1;">Employee name <input type="text" id="staffName" placeholder="CHAN TAI MAN" style="width:100%;min-width:160px;" /></label>
+        <label style="flex:1;">Department <input type="text" id="staffDept" placeholder="Housing MEP Team" style="width:100%;min-width:160px;" /></label>
+      </div>
+      <div class="rule">
+        Morning (AM) ≈ 09:00–13:30 · Afternoon (PM) ≈ 13:30–18:00 · Leave codes:
+        <code>AL</code> <code>SL</code> <code>NPL</code> <code>PH</code> <code>OFF</code> <code>Admin</code> <code>CL</code>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. Daily AM / PM codes</h2>
+      <p class="hint">Pick a leave or project code for each half-day. Empty = not worked / not claimed.</p>
+      <div class="actions">
+        <button type="button" class="btn btn-secondary btn-small" id="btnFillWeekendsOff">Fill Sat/Sun as OFF</button>
+        <button type="button" class="btn btn-secondary btn-small" id="btnClearDays">Clear all days</button>
+      </div>
+      <div class="matrix-wrap day-grid" style="max-height:480px;">
+        <table>
+          <thead>
+            <tr><th>Date</th><th>Day</th><th>AM</th><th>PM</th></tr>
+          </thead>
+          <tbody id="dayBody"></tbody>
+        </table>
+      </div>
+      <div class="summary-pills" id="livePills"></div>
+      <p class="status" id="liveStatus">Enter Staff ID and name, then fill days.</p>
+    </section>
+
+    <section>
+      <h2>3. Download for HR1</h2>
+      <div class="actions">
+        <button type="button" class="btn" id="btnExport">Download Staff Timesheet (Excel)</button>
+        <p class="status" id="exportStatus">HR1 can import this file in one click.</p>
+      </div>
+    </section>
+
+    <footer>
+      No salary on this page. Send only the downloaded .xlsx to HR1 (not a screenshot).
+    </footer>
+  </main>
+
+  <script src="xlsx.full.min.js"></script>
+  <script src="shared.js"></script>
+  <script>
+    const {
+      LEAVE_CODES, daysInMonth, monthBase, periodLabel, fileStamp,
+      emptyLeave, staffStatus, escapeHtml, downloadExcelMulti,
+      buildStaffSubmissionSheets, aggregateDaySlots, defaultProjects,
+      fillPeriodSelects, saveJson, loadJson, clearJson, normalizeSlotCode
+    } = PCP;
+
+    const STAFF_STORE = "pcpStaffDraft";
+    let periodYear = new Date().getFullYear();
+    let periodMonth = new Date().getMonth() + 1;
+    let projects = defaultProjects();
+    let days = [];
+
+    function codeOptionsHtml(selected) {
+      const sel = normalizeSlotCode(selected);
+      const leaveOpts = LEAVE_CODES.map((c) =>
+        `<option value="${c}" ${c === sel ? "selected" : ""}>${c}</option>`
+      ).join("");
+      const projOpts = projects.map((p) => {
+        const code = p.code || p.name;
+        return `<option value="${escapeHtml(code)}" ${code === sel ? "selected" : ""}>${escapeHtml(p.name)}</option>`;
+      }).join("");
+      return `<option value="">—</option>
+        <optgroup label="Leave">${leaveOpts}</optgroup>
+        <optgroup label="Projects">${projOpts}</optgroup>`;
+    }
+
+    function rebuildDaysKeepValues() {
+      const prev = {};
+      days.forEach((d) => { prev[d.date] = d; });
+      const n = daysInMonth(periodYear, periodMonth);
+      days = [];
+      for (let d = 1; d <= n; d++) {
+        const dt = new Date(periodYear, periodMonth - 1, d);
+        const ymd = periodYear + "-" + String(periodMonth).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+        const old = prev[ymd] || {};
+        days.push({
+          date: ymd,
+          day: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getDay()],
+          am: old.am || "",
+          pm: old.pm || "",
+          weekend: dt.getDay() === 0 || dt.getDay() === 6
+        });
+      }
+    }
+
+    function currentPerson() {
+      const agg = aggregateDaySlots(days, projects);
+      const projMap = {};
+      projects.forEach((p) => { projMap[p.id] = Number(agg.projectUnits[p.id]) || 0; });
+      // include any auto projects
+      agg.projects.forEach((p) => {
+        if (!projMap.hasOwnProperty(p.id)) {
+          projects.push(p);
+          projMap[p.id] = Number(agg.projectUnits[p.id]) || 0;
+        }
+      });
+      return {
+        staffId: document.getElementById("staffId").value.trim(),
+        name: document.getElementById("staffName").value.trim(),
+        department: document.getElementById("staffDept").value.trim(),
+        leave: agg.leave,
+        projects: projMap
+      };
+    }
+
+    function persist() {
+      saveJson(STAFF_STORE, {
+        periodYear, periodMonth,
+        staffId: document.getElementById("staffId").value,
+        name: document.getElementById("staffName").value,
+        department: document.getElementById("staffDept").value,
+        days: days.map((d) => ({ date: d.date, am: d.am, pm: d.pm }))
+      });
+    }
+
+    function updatePeriodUI() {
+      const daysN = daysInMonth(periodYear, periodMonth);
+      document.getElementById("basePill").textContent = "Base: " + (daysN * 2);
+      document.getElementById("daysHint").textContent = daysN + " days × 2 (AM+PM)";
+    }
+
+    function renderDays() {
+      const body = document.getElementById("dayBody");
+      body.innerHTML = days.map((d, i) => `
+        <tr class="${d.weekend ? "weekend" : ""}">
+          <td>${escapeHtml(d.date)}</td>
+          <td>${escapeHtml(d.day)}</td>
+          <td><select data-i="${i}" data-slot="am">${codeOptionsHtml(d.am)}</select></td>
+          <td><select data-i="${i}" data-slot="pm">${codeOptionsHtml(d.pm)}</select></td>
+        </tr>`).join("");
+      body.querySelectorAll("select").forEach((el) => {
+        el.addEventListener("change", () => {
+          const i = Number(el.dataset.i);
+          days[i][el.dataset.slot] = el.value;
+          refreshLive();
+          persist();
+        });
+      });
+      refreshLive();
+    }
+
+    function refreshLive() {
+      const person = currentPerson();
+      const usedProjects = projects.filter((p) => (Number(person.projects[p.id]) || 0) > 0);
+      const st = staffStatus(person, projects, periodYear, periodMonth);
+      const pills = document.getElementById("livePills");
+      const leaveBits = LEAVE_CODES.filter((c) => person.leave[c] > 0)
+        .map((c) => `<span>${c}: ${person.leave[c]}</span>`).join("");
+      const projBits = usedProjects.map((p) =>
+        `<span>${escapeHtml(p.code || p.name)}: ${person.projects[p.id]}</span>`
+      ).join("");
+      pills.innerHTML = leaveBits + projBits || "<span>No units yet</span>";
+
+      const status = document.getElementById("liveStatus");
+      status.className = "status " + (st.ok ? "ok" : (st.pUnits || st.leave ? "err" : "warn"));
+      status.textContent = "Leave " + st.leave + " · Denom " + st.denom + " · Project units " + st.pUnits +
+        (st.ok ? " · OK — ready to download" : " · Need project units = denom (gap " + (st.denom - st.pUnits) + ")");
+    }
+
+    function restore() {
+      const s = loadJson(STAFF_STORE);
+      if (!s) return false;
+      periodYear = Number(s.periodYear) || periodYear;
+      periodMonth = Number(s.periodMonth) || periodMonth;
+      document.getElementById("staffId").value = s.staffId || "";
+      document.getElementById("staffName").value = s.name || "";
+      document.getElementById("staffDept").value = s.department || "";
+      rebuildDaysKeepValues();
+      if (Array.isArray(s.days)) {
+        const map = {};
+        s.days.forEach((d) => { map[d.date] = d; });
+        days.forEach((d) => {
+          if (map[d.date]) {
+            d.am = map[d.date].am || "";
+            d.pm = map[d.date].pm || "";
+          }
+        });
+      }
+      return true;
+    }
+
+    fillPeriodSelects(
+      document.getElementById("selYear"),
+      document.getElementById("selMonth"),
+      periodYear,
+      periodMonth,
+      (y, m) => {
+        periodYear = y;
+        periodMonth = m;
+        updatePeriodUI();
+        rebuildDaysKeepValues();
+        renderDays();
+        persist();
+      }
+    );
+
+    ["staffId", "staffName", "staffDept"].forEach((id) => {
+      document.getElementById(id).addEventListener("input", () => { refreshLive(); persist(); });
+    });
+
+    document.getElementById("btnFillWeekendsOff").onclick = () => {
+      days.forEach((d) => {
+        if (!d.weekend) return;
+        if (!d.am) d.am = "OFF";
+        if (!d.pm) d.pm = "OFF";
+      });
+      renderDays();
+      persist();
+    };
+    document.getElementById("btnClearDays").onclick = () => {
+      days.forEach((d) => { d.am = ""; d.pm = ""; });
+      renderDays();
+      persist();
+    };
+    document.getElementById("btnClearStaffLocal").onclick = () => {
+      if (!confirm("Clear your saved timesheet draft in this browser?")) return;
+      clearJson(STAFF_STORE);
+      document.getElementById("staffId").value = "";
+      document.getElementById("staffName").value = "";
+      document.getElementById("staffDept").value = "";
+      days.forEach((d) => { d.am = ""; d.pm = ""; });
+      renderDays();
+      document.getElementById("exportStatus").textContent = "Draft cleared.";
+      document.getElementById("exportStatus").className = "status warn";
+    };
+
+    document.getElementById("btnExport").onclick = () => {
+      try {
+        const person = currentPerson();
+        if (!person.staffId) throw new Error("Enter Staff ID.");
+        if (!person.name) throw new Error("Enter employee name.");
+        const used = projects.filter((p) => (Number(person.projects[p.id]) || 0) > 0);
+        const exportProjects = used.length ? used : projects;
+        // Rebuild person.projects keys for exportProjects only
+        const exportPerson = {
+          ...person,
+          projects: {}
+        };
+        exportProjects.forEach((p) => {
+          exportPerson.projects[p.id] = Number(person.projects[p.id]) || 0;
+        });
+        const st = staffStatus(exportPerson, exportProjects, periodYear, periodMonth);
+        if (!st.ok) {
+          if (!confirm("Project units (" + st.pUnits + ") ≠ denom (" + st.denom + "). Download anyway?")) return;
+        }
+        const sheets = buildStaffSubmissionSheets(exportPerson, exportProjects, periodYear, periodMonth, days);
+        const fname = "Staff_Timesheet_" + fileStamp(periodYear, periodMonth) + "_" +
+          person.staffId.replace(/[^\w\-]+/g, "_") + ".xlsx";
+        downloadExcelMulti(fname, sheets);
+        document.getElementById("exportStatus").textContent =
+          "Downloaded " + fname + " — send this file to HR1.";
+        document.getElementById("exportStatus").className = "status ok";
+        persist();
+      } catch (e) {
+        document.getElementById("exportStatus").textContent = e.message;
+        document.getElementById("exportStatus").className = "status err";
+      }
+    };
+
+    if (restore()) {
+      document.getElementById("selYear").value = String(periodYear);
+      document.getElementById("selMonth").value = String(periodMonth);
+    } else {
+      rebuildDaysKeepValues();
+    }
+    updatePeriodUI();
+    renderDays();
+  </script>
+</body>
+</html>
