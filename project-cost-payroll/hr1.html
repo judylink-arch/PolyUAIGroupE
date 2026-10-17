@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HR1 — Timesheet | Project Cost Payroll</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <div class="brand-mark">HR1 only · No salary data on this page</div>
+      <h1>Timesheet &amp; Staff Check</h1>
+      <p class="sub" id="periodSub">Prepare timesheet → validate denom = project units → export Staff Check Summary for HR2</p>
+      <div class="role-bar">
+        <span class="badge">Signed in as HR1</span>
+        <a class="btn btn-secondary btn-small" href="index.html" style="background:rgba(255,255,255,0.12);color:#fff;border-color:rgba(255,255,255,0.25);text-decoration:none;">Back to role select</a>
+        <button type="button" class="btn btn-secondary btn-small" id="btnClearSaved" style="background:rgba(255,255,255,0.12);color:#fff;border-color:rgba(255,255,255,0.25);">Clear saved data</button>
+      </div>
+      <p class="switch-note">Security: no salary on this page. Entries are saved in this browser. HR2 needs a password.</p>
+    </header>
+
+    <div class="rights-strip">
+      <div class="rights-box hr1">
+        <strong>HR1 can</strong>
+        Add projects &amp; staff, enter timesheet, check denom, download Staff Check Summary (.xlsx).
+      </div>
+      <div class="rights-box hr2" style="opacity:0.55;">
+        <strong>HR1 cannot</strong>
+        View salary (column Y) or run calculate. Those stay on the password-locked HR2 page.
+      </div>
+    </div>
+
+    <section>
+      <h2>Period</h2>
+      <div class="toolbar period-bar">
+        <label>Year <select id="selYear"></select></label>
+        <label>Month <select id="selMonth"></select></label>
+        <span class="base-pill" id="basePill">Base: 62</span>
+        <span class="hint" id="daysHint" style="margin:0;">31 days × 2</span>
+      </div>
+      <div class="rule">
+        Month base = days × 2. Denom = base − (AL+SL+NPL+PH+OFF+Admin+CL).
+        <strong>Denom must equal total project units</strong> before export.
+      </div>
+    </section>
+
+    <section>
+      <h2>Prepare timesheet</h2>
+      <div class="import-grid">
+        <div class="import-card">
+          <h4><span class="step">1</span> Projects</h4>
+          <p class="hint">Add one project name, or import a list (CSV / one name per line).</p>
+          <div class="toolbar" style="margin-bottom:10px;">
+            <label style="flex:1;">Project name
+              <input type="text" id="newProjectName" placeholder="e.g. Kai Tak 1B3" style="min-width:180px;width:100%;" />
+            </label>
+            <button type="button" class="btn btn-small" id="btnAddProject">Add project</button>
+          </div>
+          <div class="chip-row" id="projectChips"></div>
+          <details>
+            <summary>Import many projects (CSV / paste)</summary>
+            <textarea id="pasteProjects" placeholder="Kai Tak 1B3&#10;Mui Wo Phase 2" style="margin-top:8px;"></textarea>
+            <div class="actions">
+              <label class="btn btn-secondary btn-small" style="cursor:pointer;">Upload .csv / .txt
+                <input type="file" id="fileProjects" accept=".csv,.txt,text/csv,text/plain" hidden />
+              </label>
+              <button type="button" class="btn btn-small" id="btnImportProjects">Import projects</button>
+              <button type="button" class="btn btn-secondary btn-small" id="btnClearProjects">Clear all projects</button>
+            </div>
+          </details>
+          <p class="counts" id="projectCount">Projects: 0</p>
+        </div>
+        <div class="import-card">
+          <h4><span class="step">2</span> Staff</h4>
+          <p class="hint">Add one staff member, or import a CSV list.</p>
+          <div class="toolbar" style="margin-bottom:10px;">
+            <label>Staff ID
+              <input type="text" id="newStaffId" placeholder="H 250401" />
+            </label>
+            <label style="flex:1;">Employee name
+              <input type="text" id="newStaffName" placeholder="CHAN TAI MAN" style="min-width:160px;width:100%;" />
+            </label>
+            <label style="flex:1;">Department
+              <input type="text" id="newStaffDept" list="deptOptions" placeholder="Housing MEP Team" style="min-width:160px;width:100%;" />
+              <datalist id="deptOptions"></datalist>
+            </label>
+            <button type="button" class="btn btn-small" id="btnAddStaff">Add staff</button>
+          </div>
+          <details>
+            <summary>Import many staff (CSV)</summary>
+            <p class="hint">Header: <code>Staff ID,Employee Name,Department</code></p>
+            <textarea id="pasteStaff" placeholder="Staff ID,Employee Name,Department" style="margin-top:8px;"></textarea>
+            <div class="actions">
+              <label class="btn btn-secondary btn-small" style="cursor:pointer;">Upload .csv / .txt
+                <input type="file" id="fileStaff" accept=".csv,.txt,text/csv,text/plain" hidden />
+              </label>
+              <button type="button" class="btn btn-small" id="btnImportStaff">Import staff</button>
+              <button type="button" class="btn btn-secondary btn-small" id="btnClearStaff">Clear all staff</button>
+            </div>
+          </details>
+          <p class="counts" id="staffCount">Staff: 0</p>
+        </div>
+      </div>
+
+      <div class="import-card" style="margin-top:14px;">
+        <h4><span class="step">3</span> Enter timesheet (dropdown)</h4>
+        <p class="hint">Choose staff → leave units → project from list → units → Add / update. Use Fill remaining to match denom.</p>
+        <div class="toolbar">
+          <label>Staff <select id="tsStaffSelect" style="min-width:260px;"></select></label>
+          <button type="button" class="btn btn-secondary btn-small" id="btnLoadDemo">Load small demo</button>
+        </div>
+        <div class="toolbar" id="tsLeaveBar"></div>
+        <div class="toolbar">
+          <label>Project <select id="tsProjectSelect" style="min-width:220px;"></select></label>
+          <label>Units <input type="number" id="tsUnits" min="0" step="1" value="0" /></label>
+          <button type="button" class="btn btn-small" id="btnAddProjectUnits">Add / update project units</button>
+          <button type="button" class="btn btn-secondary btn-small" id="btnFillRemaining">Fill remaining into selected project</button>
+        </div>
+        <p class="status" id="tsLiveStatus">Select a staff member to start.</p>
+        <div class="matrix-wrap" style="max-height:220px;margin-top:8px;">
+          <table>
+            <thead><tr><th>Project</th><th class="num">Units</th><th></th></tr></thead>
+            <tbody id="tsAllocBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="hr1Alert" class="alert"></div>
+      <h3>Staff check summary</h3>
+      <div class="toolbar">
+        <label>Filter
+          <select id="filterErrors">
+            <option value="all">All staff</option>
+            <option value="errors">Errors only</option>
+            <option value="ok">OK only</option>
+          </select>
+        </label>
+        <label>Search <input type="text" id="searchStaff" placeholder="Name or Staff ID" /></label>
+        <button type="button" class="btn btn-small" id="btnValidate">Check denom = project units</button>
+      </div>
+      <p class="counts" id="validationSummary">Not checked yet.</p>
+      <div class="matrix-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Staff ID</th><th>Name</th><th>Department</th>
+              <th class="num">Leave</th><th class="num">Base</th><th class="num">Denom</th>
+              <th class="num">Project units</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="staffSummaryBody"></tbody>
+        </table>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn" id="btnExportStaffSummary">Download Staff Check Summary (Excel) for HR2</button>
+        <p class="status" id="hr1Status">Fix all errors, then download and send the file to HR2 only.</p>
+      </div>
+    </section>
+
+    <footer>
+      HR1 page contains no salary fields and no calculate logic.
+      Give HR2 only the Staff Check Summary .xlsx (not this browser page).
+    </footer>
+  </main>
+
+  <script src="xlsx.full.min.js"></script>
+  <script src="shared.js"></script>
+  <script>
+    const {
+      LEAVE_CODES, monthBase, daysInMonth, periodLabel, fileStamp,
+      emptyLeave, staffStatus, escapeHtml, parseCsv, headerIndex,
+      downloadExcelMulti, buildStaffCheckRows, STAFF_CHECK_SHEET, fillPeriodSelects,
+      readFileAsText, saveJson, loadJson, HR1_STORE
+    } = PCP;
+
+    let periodYear = 2026;
+    let periodMonth = 8;
+    let projects = [];
+    let staff = [];
+    let selectedStaffId = null;
+    let projectSeq = 1;
+
+    function persistHr1() {
+      // Full timesheet snapshot: leave + each staff's project units
+      saveJson(HR1_STORE, {
+        periodYear,
+        periodMonth,
+        projects,
+        staff: staff.map((p) => ({
+          staffId: p.staffId,
+          name: p.name,
+          department: p.department,
+          leave: { ...(p.leave || {}) },
+          projects: { ...(p.projects || {}) }
+        })),
+        selectedStaffId,
+        projectSeq
+      });
+    }
+
+    function restoreHr1() {
+      const s = loadJson(HR1_STORE);
+      if (!s || !Array.isArray(s.staff)) return false;
+      periodYear = Number(s.periodYear) || periodYear;
+      periodMonth = Number(s.periodMonth) || periodMonth;
+      projects = Array.isArray(s.projects) ? s.projects : [];
+      staff = s.staff.map((p) => ({
+        staffId: p.staffId,
+        name: p.name,
+        department: p.department || "",
+        leave: { ...emptyLeave(), ...(p.leave || {}) },
+        projects: { ...(p.projects || {}) }
+      }));
+      syncProjectKeys(); // keep unit values for known projects; drop unknown ids
+      selectedStaffId = s.selectedStaffId || null;
+      projectSeq = Number(s.projectSeq) || projectSeq;
+      return staff.length > 0 || projects.length > 0;
+    }
+
+    function updatePeriodUI() {
+      const days = daysInMonth(periodYear, periodMonth);
+      const base = days * 2;
+      document.getElementById("basePill").textContent = "Base: " + base;
+      document.getElementById("daysHint").textContent = days + " days × 2";
+      document.getElementById("periodSub").textContent =
+        periodLabel(periodYear, periodMonth) + " · Base " + base + " · No salary on this page · Export for HR2";
+    }
+
+    function syncProjectKeys() {
+      // Preserve existing units when project list is refreshed
+      staff.forEach((person) => {
+        const prev = person.projects || {};
+        const next = {};
+        projects.forEach((p) => {
+          next[p.id] = Number(prev[p.id]) || 0;
+        });
+        person.projects = next;
+      });
+    }
+
+    function validationIssues() {
+      return staff.map((p) => ({ person: p, st: staffStatus(p, projects, periodYear, periodMonth) }))
+        .filter((x) => !x.st.ok);
+    }
+
+    function showAlert(msg) {
+      const el = document.getElementById("hr1Alert");
+      if (!msg) { el.classList.remove("show"); el.textContent = ""; return; }
+      el.textContent = msg;
+      el.classList.add("show");
+    }
+
+    function renderProjectChips() {
+      const row = document.getElementById("projectChips");
+      if (!projects.length) {
+        row.innerHTML = '<span class="hint">No projects yet — add a name above.</span>';
+        return;
+      }
+      row.innerHTML = projects.map((p) =>
+        `<span class="chip">${escapeHtml(p.name)}<button type="button" title="Remove" data-rm-proj="${p.id}">×</button></span>`
+      ).join("");
+      row.querySelectorAll("[data-rm-proj]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          projects = projects.filter((p) => p.id !== btn.dataset.rmProj);
+          syncProjectKeys();
+          renderAll();
+        });
+      });
+    }
+
+    function renderDeptOptions() {
+      const depts = [...new Set(staff.map((p) => p.department).filter(Boolean))].sort();
+      document.getElementById("deptOptions").innerHTML = depts
+        .map((d) => `<option value="${escapeHtml(d)}"></option>`).join("");
+    }
+
+    function addProjectName(name) {
+      const n = String(name || "").trim();
+      if (!n) throw new Error("Enter a project name.");
+      if (projects.some((p) => p.name.toLowerCase() === n.toLowerCase())) {
+        throw new Error("Project already exists: " + n);
+      }
+      projects.push({ id: "P" + (projectSeq++), name: n });
+      syncProjectKeys();
+    }
+
+    function addStaffRow(staffId, name, department) {
+      const id = String(staffId || "").trim();
+      const nm = String(name || "").trim();
+      const dept = String(department || "").trim();
+      if (!id) throw new Error("Enter Staff ID.");
+      if (!nm) throw new Error("Enter employee name.");
+      if (staff.some((p) => p.staffId.toLowerCase() === id.toLowerCase())) {
+        throw new Error("Staff ID already exists: " + id);
+      }
+      const proj = {};
+      projects.forEach((p) => { proj[p.id] = 0; });
+      staff.push({ staffId: id, name: nm, department: dept, leave: emptyLeave(), projects: proj });
+      selectedStaffId = id;
+    }
+
+    function renderAll() {
+      document.getElementById("projectCount").textContent =
+        "Projects: " + projects.length + (projects.length ? " — " + projects.slice(0, 4).map((p) => p.name).join(", ") + (projects.length > 4 ? "…" : "") : "");
+      document.getElementById("staffCount").textContent = "Staff: " + staff.length;
+      renderProjectChips();
+      renderDeptOptions();
+      renderTimesheetEntry();
+      renderStaffSummary();
+      persistHr1();
+    }
+
+    function currentTsStaff() {
+      const id = document.getElementById("tsStaffSelect").value;
+      return staff.find((s) => s.staffId === id) || null;
+    }
+
+    function renderTimesheetEntry() {
+      const staffSel = document.getElementById("tsStaffSelect");
+      const projSel = document.getElementById("tsProjectSelect");
+      const prevStaff = staffSel.value || selectedStaffId || (staff[0] && staff[0].staffId) || "";
+      const prevProj = projSel.value;
+      staffSel.innerHTML = staff.length
+        ? staff.map((p) => `<option value="${escapeHtml(p.staffId)}" ${p.staffId === prevStaff ? "selected" : ""}>${escapeHtml(p.staffId)} — ${escapeHtml(p.name)}</option>`).join("")
+        : '<option value="">Add staff first</option>';
+      projSel.innerHTML = projects.length
+        ? projects.map((p) => `<option value="${p.id}" ${p.id === prevProj ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("")
+        : '<option value="">Add project first</option>';
+
+      const person = currentTsStaff();
+      const leaveBar = document.getElementById("tsLeaveBar");
+      if (!person) {
+        leaveBar.innerHTML = "";
+        document.getElementById("tsAllocBody").innerHTML = '<tr><td colspan="3" class="hint">No staff selected.</td></tr>';
+        document.getElementById("tsLiveStatus").textContent = "Add staff and projects first.";
+        document.getElementById("tsLiveStatus").className = "status warn";
+        return;
+      }
+      leaveBar.innerHTML = LEAVE_CODES.map((c) =>
+        `<label>${c}<input type="number" min="0" step="1" data-ts-leave="${c}" value="${person.leave[c] || 0}" /></label>`
+      ).join("");
+      leaveBar.querySelectorAll("input[data-ts-leave]").forEach((el) => {
+        el.addEventListener("change", () => {
+          person.leave[el.dataset.tsLeave] = Number(el.value) || 0;
+          refreshTs(person);
+          renderStaffSummary();
+        });
+      });
+      refreshTs(person);
+    }
+
+    function refreshTs(person) {
+      const st = staffStatus(person, projects, periodYear, periodMonth);
+      const status = document.getElementById("tsLiveStatus");
+      status.className = "status " + (st.ok ? "ok" : "err");
+      status.textContent = person.staffId + ": leave " + st.leave + " · denom " + st.denom +
+        " · project units " + st.pUnits + (st.ok ? " · OK" : " · ERROR: need " + (st.denom - st.pUnits) + " more project units");
+      const body = document.getElementById("tsAllocBody");
+      const rows = projects.filter((p) => (Number(person.projects[p.id]) || 0) > 0).map((p) => `
+        <tr>
+          <td>${escapeHtml(p.name)}</td>
+          <td class="num">${person.projects[p.id]}</td>
+          <td><button type="button" class="btn btn-danger btn-small" data-clear-proj="${p.id}">Remove</button></td>
+        </tr>`).join("");
+      body.innerHTML = rows || '<tr><td colspan="3" class="hint">No project units yet.</td></tr>';
+      body.querySelectorAll("[data-clear-proj]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          person.projects[btn.dataset.clearProj] = 0;
+          refreshTs(person);
+          renderStaffSummary();
+        });
+      });
+      persistHr1(); // save leave + all project units for every staff
+    }
+
+    function renderStaffSummary() {
+      const filter = document.getElementById("filterErrors").value;
+      const q = document.getElementById("searchStaff").value.trim().toLowerCase();
+      const issues = validationIssues();
+      document.getElementById("validationSummary").textContent = !staff.length
+        ? "No staff loaded."
+        : issues.length === 0
+          ? "All " + staff.length + " staff OK."
+          : issues.length + " error(s). Fix before export to HR2.";
+      showAlert(issues.length
+        ? issues.length + " staff have denom ≠ project units. " +
+          issues.slice(0, 3).map((x) => x.person.staffId + " (" + x.st.denom + " vs " + x.st.pUnits + ")").join("; ")
+        : "");
+      const rows = staff.filter((p) => {
+        const st = staffStatus(p, projects, periodYear, periodMonth);
+        if (filter === "errors" && st.ok) return false;
+        if (filter === "ok" && !st.ok) return false;
+        if (q && !(p.name.toLowerCase().includes(q) || p.staffId.toLowerCase().includes(q))) return false;
+        return true;
+      });
+      document.getElementById("staffSummaryBody").innerHTML = rows.map((p) => {
+        const st = staffStatus(p, projects, periodYear, periodMonth);
+        return `<tr class="${st.ok ? "" : "error-row"}">
+          <td>${escapeHtml(p.staffId)}</td><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.department)}</td>
+          <td class="num">${st.leave}</td><td class="num">${st.base}</td>
+          <td class="num ${st.ok ? "" : "error-cell"}">${st.denom}</td>
+          <td class="num ${st.ok ? "" : "error-cell"}">${st.pUnits}</td>
+          <td>${st.ok ? "OK" : "ERROR"}</td>
+          <td>
+            <button type="button" class="btn btn-secondary btn-small" data-edit="${escapeHtml(p.staffId)}">Edit</button>
+            <button type="button" class="btn btn-danger btn-small" data-rm-staff="${escapeHtml(p.staffId)}">Remove</button>
+          </td>
+        </tr>`;
+      }).join("") || '<tr><td colspan="9" class="hint">No rows.</td></tr>';
+      document.querySelectorAll("[data-edit]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          selectedStaffId = btn.dataset.edit;
+          document.getElementById("tsStaffSelect").value = selectedStaffId;
+          renderTimesheetEntry();
+          document.getElementById("tsStaffSelect").scrollIntoView({ behavior: "smooth" });
+        });
+      });
+      document.querySelectorAll("[data-rm-staff]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.rmStaff;
+          staff = staff.filter((p) => p.staffId !== id);
+          if (selectedStaffId === id) selectedStaffId = null;
+          renderAll();
+        });
+      });
+    }
+
+    function importProjects(text) {
+      const rows = parseCsv(text);
+      if (!rows.length) throw new Error("No project lines found.");
+      let names = [];
+      const hi = headerIndex(rows[0], ["project name", "project", "name"]);
+      names = hi >= 0
+        ? rows.slice(1).map((r) => String(r[hi] || "").trim()).filter(Boolean)
+        : rows.map((r) => String(r[0] || "").trim()).filter(Boolean);
+      const unique = [];
+      const seen = new Set();
+      names.forEach((n) => {
+        const k = n.toLowerCase();
+        if (!seen.has(k)) { seen.add(k); unique.push(n); }
+      });
+      projects = unique.map((name, i) => ({ id: "P" + (projectSeq++) + "_" + i, name }));
+      syncProjectKeys();
+    }
+
+    function importStaff(text) {
+      const rows = parseCsv(text);
+      if (rows.length < 2) throw new Error("Staff CSV needs header + rows.");
+      const h = rows[0];
+      const iId = headerIndex(h, ["staff id", "staffid", "id"]);
+      const iName = headerIndex(h, ["employee name", "name"]);
+      const iDept = headerIndex(h, ["department", "dept"]);
+      if (iId < 0 || iName < 0) throw new Error("Need Staff ID and Employee Name columns.");
+      const next = [];
+      const seen = new Set();
+      rows.slice(1).forEach((r) => {
+        const staffId = String(r[iId] || "").trim();
+        const name = String(r[iName] || "").trim();
+        if (!staffId || !name) return;
+        if (seen.has(staffId.toLowerCase())) return;
+        seen.add(staffId.toLowerCase());
+        const proj = {};
+        projects.forEach((p) => { proj[p.id] = 0; });
+        next.push({
+          staffId, name,
+          department: iDept >= 0 ? String(r[iDept] || "").trim() : "",
+          leave: emptyLeave(),
+          projects: proj
+        });
+      });
+      if (!next.length) throw new Error("No valid staff rows.");
+      staff = next;
+      selectedStaffId = null;
+    }
+
+    function loadDemo() {
+      periodYear = 2026;
+      periodMonth = 8;
+      document.getElementById("selYear").value = "2026";
+      document.getElementById("selMonth").value = "8";
+      updatePeriodUI();
+      projects = [
+        { id: "KT1B3", name: "Kai Tak 1B3" },
+        { id: "MWP2", name: "Mui Wo Phase 2" },
+        { id: "TST", name: "TST Pumping Station" },
+        { id: "SKM", name: "石硤尾雨水排放系統" }
+      ];
+      staff = [
+        {
+          staffId: "H 250401", name: "CHAN TAI MAN", department: "Housing MEP Team",
+          leave: { AL: 2, SL: 0, NPL: 0, PH: 2, OFF: 4, Admin: 2, CL: 0 },
+          projects: { KT1B3: 20, MWP2: 20, TST: 12, SKM: 0 }
+        },
+        {
+          staffId: "H 250402", name: "LEE SIU FAN", department: "Water, Drainage & Infrastructure MEP Team",
+          leave: { AL: 0, SL: 2, NPL: 0, PH: 0, OFF: 4, Admin: 0, CL: 0 },
+          projects: { KT1B3: 0, MWP2: 28, TST: 0, SKM: 28 }
+        },
+        {
+          staffId: "H 250403", name: "WONG MEI YEE", department: "General Building Services Team",
+          leave: { AL: 31, SL: 0, NPL: 0, PH: 0, OFF: 31, Admin: 0, CL: 0 },
+          projects: { KT1B3: 0, MWP2: 0, TST: 0, SKM: 0 }
+        }
+      ];
+      document.getElementById("hr1Status").textContent = "Demo loaded (no salary fields).";
+      document.getElementById("hr1Status").className = "status ok";
+      renderAll();
+    }
+
+    function exportSummary() {
+      if (!staff.length) throw new Error("No staff to export.");
+      if (!projects.length) throw new Error("No projects to export.");
+      const issues = validationIssues();
+      if (issues.length) throw new Error("Cannot export: " + issues.length + " staff still have denom ≠ project units.");
+      // Data sheet = staff rows only (no footer remarks — those break HR2 import)
+      const dataRows = buildStaffCheckRows(staff, projects, periodYear, periodMonth);
+      const noteRows = [
+        ["Handoff note", "Give this file to HR2 only. Contains no salary."],
+        ["Staff count", staff.length],
+        ["Base", monthBase(periodYear, periodMonth)],
+        ["Period", periodLabel(periodYear, periodMonth)]
+      ];
+      downloadExcelMulti(
+        "Staff_Check_Summary_" + fileStamp(periodYear, periodMonth) + ".xlsx",
+        [
+          { name: STAFF_CHECK_SHEET, rows: dataRows },
+          { name: "Notes", rows: noteRows }
+        ]
+      );
+    }
+
+    fillPeriodSelects(
+      document.getElementById("selYear"),
+      document.getElementById("selMonth"),
+      periodYear,
+      periodMonth,
+      (y, m) => { periodYear = y; periodMonth = m; updatePeriodUI(); renderAll(); }
+    );
+    updatePeriodUI();
+
+    document.getElementById("btnAddProject").onclick = () => {
+      try {
+        const input = document.getElementById("newProjectName");
+        addProjectName(input.value);
+        input.value = "";
+        document.getElementById("hr1Status").textContent = "Added project. Total: " + projects.length;
+        document.getElementById("hr1Status").className = "status ok";
+        renderAll();
+        input.focus();
+      } catch (e) {
+        document.getElementById("hr1Status").textContent = e.message;
+        document.getElementById("hr1Status").className = "status err";
+      }
+    };
+    document.getElementById("newProjectName").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("btnAddProject").click();
+    });
+    document.getElementById("btnAddStaff").onclick = () => {
+      try {
+        addStaffRow(
+          document.getElementById("newStaffId").value,
+          document.getElementById("newStaffName").value,
+          document.getElementById("newStaffDept").value
+        );
+        document.getElementById("newStaffId").value = "";
+        document.getElementById("newStaffName").value = "";
+        document.getElementById("newStaffDept").value = "";
+        document.getElementById("hr1Status").textContent = "Added staff. Total: " + staff.length;
+        document.getElementById("hr1Status").className = "status ok";
+        renderAll();
+        document.getElementById("newStaffId").focus();
+      } catch (e) {
+        document.getElementById("hr1Status").textContent = e.message;
+        document.getElementById("hr1Status").className = "status err";
+      }
+    };
+    ["newStaffId", "newStaffName", "newStaffDept"].forEach((id) => {
+      document.getElementById(id).addEventListener("keydown", (e) => {
+        if (e.key === "Enter") document.getElementById("btnAddStaff").click();
+      });
+    });
+    document.getElementById("btnImportProjects").onclick = () => {
+      try {
+        importProjects(document.getElementById("pasteProjects").value);
+        document.getElementById("hr1Status").textContent = "Imported " + projects.length + " projects.";
+        document.getElementById("hr1Status").className = "status ok";
+        renderAll();
+      } catch (e) {
+        document.getElementById("hr1Status").textContent = e.message;
+        document.getElementById("hr1Status").className = "status err";
+      }
+    };
+    document.getElementById("btnImportStaff").onclick = () => {
+      try {
+        importStaff(document.getElementById("pasteStaff").value);
+        document.getElementById("hr1Status").textContent = "Imported " + staff.length + " staff.";
+        document.getElementById("hr1Status").className = "status ok";
+        renderAll();
+      } catch (e) {
+        document.getElementById("hr1Status").textContent = e.message;
+        document.getElementById("hr1Status").className = "status err";
+      }
+    };
+    document.getElementById("btnClearProjects").onclick = () => { projects = []; syncProjectKeys(); renderAll(); };
+    document.getElementById("btnClearStaff").onclick = () => { staff = []; selectedStaffId = null; renderAll(); };
+    document.getElementById("btnLoadDemo").onclick = loadDemo;
+    document.getElementById("tsStaffSelect").onchange = () => {
+      selectedStaffId = document.getElementById("tsStaffSelect").value;
+      renderTimesheetEntry();
+    };
+    document.getElementById("btnAddProjectUnits").onclick = () => {
+      const person = currentTsStaff();
+      const projId = document.getElementById("tsProjectSelect").value;
+      const units = Number(document.getElementById("tsUnits").value) || 0;
+      if (!person || !projId) return;
+      person.projects[projId] = units;
+      selectedStaffId = person.staffId;
+      refreshTs(person);
+      renderStaffSummary();
+      persistHr1();
+      document.getElementById("hr1Status").textContent =
+        "Saved " + person.staffId + " · " + (projects.find((p) => p.id === projId)?.name || projId) + " = " + units + " units (remembered in this browser).";
+      document.getElementById("hr1Status").className = "status ok";
+    };
+    document.getElementById("btnFillRemaining").onclick = () => {
+      const person = currentTsStaff();
+      const projId = document.getElementById("tsProjectSelect").value;
+      if (!person || !projId) return;
+      const st = staffStatus(person, projects, periodYear, periodMonth);
+      const other = projects.reduce((s, p) => p.id === projId ? s : s + (Number(person.projects[p.id]) || 0), 0);
+      person.projects[projId] = Math.max(0, st.denom - other);
+      document.getElementById("tsUnits").value = person.projects[projId];
+      refreshTs(person);
+      renderStaffSummary();
+      persistHr1();
+    };
+    document.getElementById("filterErrors").onchange = renderStaffSummary;
+    document.getElementById("searchStaff").oninput = renderStaffSummary;
+    document.getElementById("btnValidate").onclick = () => {
+      renderStaffSummary();
+      const issues = validationIssues();
+      const el = document.getElementById("hr1Status");
+      if (issues.length) {
+        el.textContent = issues.length + " error(s). Fix before sending file to HR2.";
+        el.className = "status err";
+        document.getElementById("filterErrors").value = "errors";
+        renderStaffSummary();
+      } else {
+        el.textContent = "All OK. Download Staff Check Summary for HR2.";
+        el.className = "status ok";
+      }
+    };
+    document.getElementById("btnExportStaffSummary").onclick = () => {
+      try {
+        exportSummary();
+        document.getElementById("hr1Status").textContent =
+          "Downloaded Staff Check Summary. Send this .xlsx to HR2 (not this HTML page).";
+        document.getElementById("hr1Status").className = "status ok";
+      } catch (e) {
+        document.getElementById("hr1Status").textContent = e.message;
+        document.getElementById("hr1Status").className = "status err";
+      }
+    };
+    document.getElementById("fileProjects").onchange = async (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      document.getElementById("pasteProjects").value = await readFileAsText(f);
+      document.getElementById("btnImportProjects").click();
+    };
+    document.getElementById("fileStaff").onchange = async (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      document.getElementById("pasteStaff").value = await readFileAsText(f);
+      document.getElementById("btnImportStaff").click();
+    };
+    document.getElementById("btnClearSaved").onclick = () => {
+      if (!confirm("Clear all saved HR1 timesheet data in this browser?")) return;
+      PCP.clearJson(HR1_STORE);
+      projects = [];
+      staff = [];
+      selectedStaffId = null;
+      loadDemo();
+      document.getElementById("hr1Status").textContent = "Saved data cleared. Demo reloaded.";
+      document.getElementById("hr1Status").className = "status warn";
+    };
+
+    if (restoreHr1()) {
+      document.getElementById("selYear").value = String(periodYear);
+      document.getElementById("selMonth").value = String(periodMonth);
+      updatePeriodUI();
+      renderAll();
+      const unitRows = staff.reduce((n, p) => n + projects.filter((pr) => (Number(p.projects[pr.id]) || 0) > 0).length, 0);
+      document.getElementById("hr1Status").textContent =
+        "Restored " + staff.length + " staff and " + unitRows + " project-unit entries from this browser.";
+      document.getElementById("hr1Status").className = "status ok";
+    } else {
+      loadDemo();
+    }
+  </script>
+</body>
+</html>
