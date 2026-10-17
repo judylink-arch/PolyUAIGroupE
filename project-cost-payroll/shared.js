@@ -666,9 +666,11 @@
     monthSel.addEventListener("change", fire);
   }
 
-  /** Demo HR2 password — change for your workshop. Not production security. */
+  /** Demo passwords — change for your workshop. Not production security. */
   const HR2_PASSWORD = "HR2-secure";
+  const SENIOR_PASSWORD = "SENIOR-secure";
   const AUTH_KEY = "pcpHr2Auth";
+  const SENIOR_AUTH_KEY = "pcpSeniorAuth";
   const HR1_STORE = "pcpHr1State";
   const HR2_STORE = "pcpHr2State";
 
@@ -684,6 +686,20 @@
 
   function lockHr2() {
     try { sessionStorage.removeItem(AUTH_KEY); } catch (e) { /* ignore */ }
+  }
+
+  function isSeniorUnlocked() {
+    try { return sessionStorage.getItem(SENIOR_AUTH_KEY) === "1"; } catch (e) { return false; }
+  }
+
+  function unlockSenior(password) {
+    if (String(password) !== SENIOR_PASSWORD) return false;
+    try { sessionStorage.setItem(SENIOR_AUTH_KEY, "1"); } catch (e) { /* ignore */ }
+    return true;
+  }
+
+  function lockSenior() {
+    try { sessionStorage.removeItem(SENIOR_AUTH_KEY); } catch (e) { /* ignore */ }
   }
 
   function saveJson(key, data) {
@@ -712,12 +728,17 @@
     UNITS_PREFIX,
     DEFAULT_PROJECT_CODES,
     HR2_PASSWORD,
+    SENIOR_PASSWORD,
     AUTH_KEY,
+    SENIOR_AUTH_KEY,
     HR1_STORE,
     HR2_STORE,
     isHr2Unlocked,
     unlockHr2,
     lockHr2,
+    isSeniorUnlocked,
+    unlockSenior,
+    lockSenior,
     saveJson,
     loadJson,
     clearJson,

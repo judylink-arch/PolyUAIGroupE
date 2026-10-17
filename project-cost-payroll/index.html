@@ -58,12 +58,21 @@
         <button type="button" class="access-card hr2-card" id="btnOpenDash" style="text-align:left;width:100%;font:inherit;">
           <h3>Cost dashboard</h3>
           <ul>
-            <li>Password required (same as HR2)</li>
-            <li>Project and department cost bars</li>
-            <li>Uses the latest HR2 calculation</li>
-            <li class="deny">No numbers until Calculate is run</li>
+            <li>HR2 password</li>
+            <li>Month total, project ranks, department mix</li>
+            <li class="deny">No staff names · no individual pay</li>
           </ul>
           <span class="btn btn-small" style="pointer-events:none;">Open dashboard</span>
+        </button>
+        <button type="button" class="access-card hr2-card" id="btnOpenSenior" style="text-align:left;width:100%;font:inherit;">
+          <h3>Senior view</h3>
+          <ul>
+            <li>Separate senior password</li>
+            <li>Same project and department view as the cost dashboard</li>
+            <li>Plus who the cost is attached to</li>
+            <li class="deny">Not for the cost meeting</li>
+          </ul>
+          <span class="btn btn-small" style="pointer-events:none;">Enter senior password</span>
         </button>
         <button type="button" class="access-card hr2-card" id="btnOpenHr2" style="text-align:left;width:100%;font:inherit;">
           <h3>Open HR2 — Salary &amp; Calculate</h3>
@@ -79,8 +88,8 @@
       </div>
 
       <div id="hr2PassBox" class="import-card hidden" style="margin-top:16px;">
-        <h4>HR2 password</h4>
-        <p class="hint">Demo password for workshop (change <code>HR2_PASSWORD</code> in <code>shared.js</code>).</p>
+        <h4 id="passTitle">HR2 password</h4>
+        <p class="hint" id="passHint">Demo password for workshop (change <code>HR2_PASSWORD</code> in <code>shared.js</code>).</p>
         <div class="toolbar" style="margin:0;">
           <label style="flex:1;">Password
             <input type="password" id="hr2Password" autocomplete="current-password" style="min-width:200px;" />
@@ -94,45 +103,63 @@
 
       <p class="hint" style="margin-top:16px;">
         Recommended: HR1 PC opens only <code>hr1.html</code>.
-        HR2 PC keeps <code>hr2.html</code> + salary files. Default password: <code>HR2-secure</code>.
+        HR2 PC keeps <code>hr2.html</code> + salary files. HR2 password: <code>HR2-secure</code>.
+        Senior view password: <code>SENIOR-secure</code>.
       </p>
     </div>
   </div>
 
   <script src="shared.js"></script>
   <script>
-    const { unlockHr2, isHr2Unlocked } = PCP;
+    const { unlockHr2, isHr2Unlocked, unlockSenior, isSeniorUnlocked } = PCP;
     const box = document.getElementById("hr2PassBox");
     const err = document.getElementById("hr2PassErr");
     const needNote = document.getElementById("hr2NeedNote");
     const input = document.getElementById("hr2Password");
+    const passTitle = document.getElementById("passTitle");
+    const passHint = document.getElementById("passHint");
+
+    let unlockDest = "hr2.html";
+    let gate = "hr2";
 
     function showPassBox(fromRedirect) {
       box.classList.remove("hidden");
       err.classList.add("hidden");
       needNote.classList.toggle("hidden", !fromRedirect);
+      const senior = gate === "senior";
+      passTitle.textContent = senior ? "Senior password" : "HR2 password";
+      passHint.textContent = senior
+        ? "Senior view only. Demo password is SENIOR-secure (SENIOR_PASSWORD in shared.js)."
+        : "Demo password for workshop (change HR2_PASSWORD in shared.js).";
+      needNote.textContent = senior
+        ? "Senior view is locked. Enter the senior password to continue."
+        : "HR2 is locked. Enter the password to continue.";
       input.value = "";
       input.focus();
     }
 
-    let unlockDest = "hr2.html";
-    document.getElementById("btnOpenHr2").onclick = () => openLocked("hr2.html");
-    document.getElementById("btnOpenDash").onclick = () => openLocked("dashboard.html");
-    function openLocked(dest) {
-      if (isHr2Unlocked()) {
+    function openGate(dest, which) {
+      gate = which;
+      unlockDest = dest;
+      const open = which === "senior" ? isSeniorUnlocked() : isHr2Unlocked();
+      if (open) {
         location.href = dest;
         return;
       }
-      unlockDest = dest;
       showPassBox(false);
     }
+
+    document.getElementById("btnOpenHr2").onclick = () => openGate("hr2.html", "hr2");
+    document.getElementById("btnOpenDash").onclick = () => openGate("dashboard.html", "hr2");
+    document.getElementById("btnOpenSenior").onclick = () => openGate("senior.html", "senior");
     document.getElementById("btnHr2Cancel").onclick = () => {
       box.classList.add("hidden");
       err.classList.add("hidden");
       needNote.classList.add("hidden");
     };
     function tryUnlock() {
-      if (unlockHr2(input.value)) {
+      const ok = gate === "senior" ? unlockSenior(input.value) : unlockHr2(input.value);
+      if (ok) {
         location.href = unlockDest;
       } else {
         err.classList.remove("hidden");
@@ -143,12 +170,11 @@
     document.getElementById("btnHr2Unlock").onclick = tryUnlock;
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") tryUnlock(); });
 
-    // Deep-link / blocked hr2.html → ask for password here
     const need = new URLSearchParams(location.search).get("need");
-    if (need === "hr2" || need === "dashboard") {
-      unlockDest = need === "dashboard" ? "dashboard.html" : "hr2.html";
-      if (isHr2Unlocked()) location.replace(unlockDest);
-      else showPassBox(true);
+    if (need === "hr2" || need === "dashboard" || need === "senior") {
+      if (need === "senior") openGate("senior.html", "senior");
+      else openGate(need === "dashboard" ? "dashboard.html" : "hr2.html", "hr2");
+      if (!(need === "senior" ? isSeniorUnlocked() : isHr2Unlocked())) showPassBox(true);
     }
   </script>
 </body>
