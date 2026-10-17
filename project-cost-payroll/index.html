@@ -55,6 +55,16 @@
           </ul>
           <span class="btn btn-small" style="pointer-events:none;">Go to HR1 (no password)</span>
         </a>
+        <button type="button" class="access-card hr2-card" id="btnOpenDash" style="text-align:left;width:100%;font:inherit;">
+          <h3>Cost dashboard</h3>
+          <ul>
+            <li>Password required (same as HR2)</li>
+            <li>Project and department cost bars</li>
+            <li>Uses the latest HR2 calculation</li>
+            <li class="deny">No numbers until Calculate is run</li>
+          </ul>
+          <span class="btn btn-small" style="pointer-events:none;">Open dashboard</span>
+        </button>
         <button type="button" class="access-card hr2-card" id="btnOpenHr2" style="text-align:left;width:100%;font:inherit;">
           <h3>Open HR2 — Salary &amp; Calculate</h3>
           <ul>
@@ -105,13 +115,17 @@
       input.focus();
     }
 
-    document.getElementById("btnOpenHr2").onclick = () => {
+    let unlockDest = "hr2.html";
+    document.getElementById("btnOpenHr2").onclick = () => openLocked("hr2.html");
+    document.getElementById("btnOpenDash").onclick = () => openLocked("dashboard.html");
+    function openLocked(dest) {
       if (isHr2Unlocked()) {
-        location.href = "hr2.html";
+        location.href = dest;
         return;
       }
+      unlockDest = dest;
       showPassBox(false);
-    };
+    }
     document.getElementById("btnHr2Cancel").onclick = () => {
       box.classList.add("hidden");
       err.classList.add("hidden");
@@ -119,7 +133,7 @@
     };
     function tryUnlock() {
       if (unlockHr2(input.value)) {
-        location.href = "hr2.html";
+        location.href = unlockDest;
       } else {
         err.classList.remove("hidden");
         needNote.classList.add("hidden");
@@ -130,8 +144,10 @@
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") tryUnlock(); });
 
     // Deep-link / blocked hr2.html → ask for password here
-    if (new URLSearchParams(location.search).get("need") === "hr2") {
-      if (isHr2Unlocked()) location.replace("hr2.html");
+    const need = new URLSearchParams(location.search).get("need");
+    if (need === "hr2" || need === "dashboard") {
+      unlockDest = need === "dashboard" ? "dashboard.html" : "hr2.html";
+      if (isHr2Unlocked()) location.replace(unlockDest);
       else showPassBox(true);
     }
   </script>
