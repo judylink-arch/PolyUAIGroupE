@@ -1,0 +1,101 @@
+﻿employee_id,name,position,department,join_date,status
+QT001,Helen Yip,Project Manager,Engineering,2020-09-01,Active
+QT002,Oscar Lai,Project Manager,Engineering,2020-07-01,Active
+QT003,Nicole Fung,Project Manager,Engineering,2015-01-01,Active
+QT004,Elaine Chan,Project Manager,Engineering,2022-08-01,Active
+QT005,Winnie Kwok,Senior Engineer,Engineering,2024-07-01,Active
+QT006,Vincent Lee,Senior Engineer,Engineering,2020-09-01,Active
+QT007,Michelle Ng,Senior Engineer,Engineering,2012-12-01,Active
+QT008,Fiona Mak,Senior Engineer,Engineering,2021-09-01,Active
+QT009,Dennis Chow,Senior Engineer,Engineering,2024-10-01,Active
+QT010,Calvin Siu,Senior Engineer,Engineering,2019-09-01,Active
+QT011,Michelle Lam,Senior Engineer,Engineering,2024-03-01,Active
+QT012,Peggy Tang,Senior Engineer,Engineering,2019-03-01,Active
+QT013,Helen Law,Senior Engineer,Engineering,2023-08-01,Active
+QT014,Louis Mak,Senior Engineer,Engineering,2022-05-01,Active
+QT015,Zoe Tang,Engineer,Engineering,2015-05-01,Active
+QT016,Oscar Fung,Engineer,Engineering,2024-09-01,Active
+QT017,Queenie Tsang,Engineer,Engineering,2019-08-01,Active
+QT018,Dennis Yeung,Engineer,Engineering,2022-01-01,Active
+QT019,Elaine Tsang,Engineer,Engineering,2023-09-01,Active
+QT020,Dennis Wu,Engineer,Engineering,2019-02-01,Active
+QT021,Kenny Cheung,Engineer,Engineering,2015-12-01,Active
+QT022,Fiona Chan,Engineer,Engineering,2019-10-01,Active
+QT023,Fiona Lai,Engineer,Engineering,2024-04-01,Active
+QT024,Kitty Tse,Engineer,Engineering,2022-11-01,Active
+QT025,Nicole Siu,Engineer,Engineering,2024-08-01,Active
+QT026,Nicole Lau,Engineer,Engineering,2021-12-01,Active
+QT027,Karen Lau,Engineer,Engineering,2024-10-01,Active
+QT028,Jacky Chow,Engineer,Engineering,2024-04-01,Active
+QT029,Yuki Lee,Engineer,Engineering,2012-06-01,Active
+QT030,Ben Chan,Engineer,Engineering,2020-08-01,Active
+QT031,Ursula Cheung,Engineer,Engineering,2019-08-01,Active
+QT032,Jacky Siu,Engineer,Engineering,2020-04-01,Active
+QT033,Oscar Lam,Engineer,Engineering,2022-12-01,Active
+QT034,Mandy Law,Engineer,Engineering,2014-01-01,Active
+QT035,Daisy Fung,Engineer,Engineering,2024-11-01,Active
+QT036,Ivan Law,Engineer,Engineering,2020-04-01,Active
+QT037,Ivan Ho,Assistant Engineer,Engineering,2022-03-01,Active
+QT038,Fiona Mak,Assistant Engineer,Engineering,2016-03-01,Active
+QT039,Henry Hui,Assistant Engineer,Engineering,2018-05-01,Active
+QT040,Elaine Cheung,Assistant Engineer,Engineering,2020-09-01,Active
+QT041,Nelson Lam,Assistant Engineer,Engineering,2012-02-01,Active
+QT042,Kitty Poon,Assistant Engineer,Engineering,2014-01-01,Active
+QT043,Winnie Yeung,Assistant Engineer,Engineering,2022-10-01,Active
+QT044,Peggy Tsang,Assistant Engineer,Engineering,2016-09-01,Active
+QT045,Michelle Ng,Assistant Engineer,Engineering,2021-05-01,Active
+QT046,Queenie Cheung,Assistant Engineer,Engineering,2018-03-01,Active
+QT047,Leo Law,Assistant Engineer,Engineering,2022-02-01,Active
+QT048,Sandy Yip,Assistant Engineer,Engineering,2014-05-01,Active
+QT049,Queenie Tang,Assistant Engineer,Engineering,2012-01-01,Active
+QT050,Helen Cheung,Assistant Engineer,Engineering,2022-09-01,Active
+QT051,Winnie Yip,Foreman,Site,2024-08-01,Active
+QT052,Zoe Yip,Foreman,Site,2021-04-01,Active
+QT053,Kenny Chow,Foreman,Site,2022-05-01,Active
+QT054,Daisy Wu,Foreman,Site,2023-07-01,Active
+QT055,Sandy Wu,Foreman,Site,2024-02-01,Active
+QT056,Nicole Chan,Foreman,Site,2020-06-01,Active
+QT057,Karen Lai,Foreman,Site,2013-02-01,Active
+QT058,Oscar Law,Foreman,Site,2022-05-01,Active
+QT059,Winnie Tang,Foreman,Site,2018-07-01,Active
+QT060,Ivan Ho,Foreman,Site,2020-01-01,Active
+QT061,Queenie Lau,Technician,Site,2015-01-01,Active
+QT062,Calvin Tse,Technician,Site,2017-03-01,Active
+QT063,Louis Wong,Technician,Site,2022-09-01,Active
+QT064,Daisy Poon,Technician,Site,2012-11-01,Active
+QT065,Iris Lau,Technician,Site,2023-07-01,Active
+QT066,Olivia Yeung,Technician,Site,2016-06-01,Active
+QT067,Frankie Yeung,Technician,Site,2024-08-01,Active
+QT068,Karen Law,Technician,Site,2018-03-01,Active
+QT069,Winnie Chow,Technician,Site,2023-07-01,Active
+QT070,Tommy Kwok,Technician,Site,2020-12-01,Active
+QT071,Ben Yeung,Technician,Site,2015-12-01,Active
+QT072,Zoe Mak,Technician,Site,2020-09-01,Active
+QT073,Fiona Lau,Technician,Site,2023-07-01,Active
+QT074,Carmen Wu,Technician,Site,2021-11-01,Active
+QT075,Sandy Yeung,Technician,Site,2016-06-01,Active
+QT076,Mandy Wu,Technician,Site,2022-01-01,Active
+QT077,Winnie Hui,Draftsman,Design,2024-09-01,Active
+QT078,Leo Yip,Draftsman,Design,2020-03-01,Active
+QT079,Iris Poon,Draftsman,Design,2023-11-01,Active
+QT080,Eric Kwok,Draftsman,Design,2016-04-01,Active
+QT081,Ivan Cheung,Draftsman,Design,2017-08-01,Active
+QT082,Eric Mak,Draftsman,Design,2016-10-01,Active
+QT083,Gloria Choi,Draftsman,Design,2013-09-01,Active
+QT084,Frankie Siu,Draftsman,Design,2017-02-01,Active
+QT085,Henry Hui,QS / Estimator,Tendering,2016-05-01,Active
+QT086,Iris Yeung,QS / Estimator,Tendering,2017-06-01,Active
+QT087,Mandy Fung,QS / Estimator,Tendering,2015-12-01,Active
+QT088,Calvin Siu,QS / Estimator,Tendering,2018-04-01,Active
+QT089,Dennis Tse,QS / Estimator,Tendering,2017-02-01,Active
+QT090,Queenie Lau,QS / Estimator,Tendering,2020-11-01,Active
+QT091,Louis Hui,Admin Officer,Admin,2013-05-01,Active
+QT092,Zoe Chan,Admin Officer,Admin,2020-12-01,Active
+QT093,Gary Poon,Admin Officer,Admin,2024-08-01,Active
+QT094,Kitty Chow,Admin Officer,Admin,2015-07-01,Active
+QT095,Zoe Wu,Accountant,Accounts,2014-01-01,Active
+QT096,Ivan Yip,Accountant,Accounts,2021-11-01,Active
+QT097,Gloria Yip,Accountant,Accounts,2012-01-01,Active
+QT098,Raymond Yip,HR Officer,HR,2012-04-01,Active
+QT099,Fiona Yeung,HR Officer,HR,2023-04-01,Active
+QT100,Jacky Yip,HR Officer,HR,2015-08-01,Active
