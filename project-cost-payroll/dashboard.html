@@ -12,9 +12,9 @@
 <body>
   <main>
     <header class="hero" style="background:linear-gradient(135deg,#6b4e12 0%,#b8860b 48%,#e8c547 120%);">
-      <div class="brand-mark">HR2 only · Same numbers as the cost calculation</div>
+      <div class="brand-mark">Cost meeting · No staff names · No individual pay</div>
       <h1>Project cost dashboard</h1>
-      <p class="sub" id="periodSub">Visual view of the Salary (Actual) allocation</p>
+      <p class="sub" id="periodSub">Month total, projects, and departments</p>
       <div class="role-bar">
         <span class="badge">Cost allocation</span>
         <a class="btn btn-secondary btn-small" href="hr2.html" style="background:rgba(255,255,255,0.12);color:#fff;border-color:rgba(255,255,255,0.25);text-decoration:none;">Back to HR2</a>
@@ -23,7 +23,7 @@
       </div>
     </header>
 
-    <div id="empty" class="locked-panel" style="margin-top:18px;">
+    <div id="empty" class="locked-panel hidden" style="margin-top:18px;">
       No calculation yet. On HR2, import the Staff Check Summary and salary file, then click Calculate.
     </div>
 
@@ -32,7 +32,7 @@
         <div class="stage-total">
           <div class="eyebrow">Allocated this month</div>
           <strong id="grandFigure">HKD 0</strong>
-          <div id="grandCaption">Project cost after salary split</div>
+          <div id="grandCaption">Project and department totals</div>
           <div class="stage-chips" id="chips"></div>
         </div>
         <div class="spotlight" id="spotlight"></div>
@@ -43,31 +43,20 @@
         <div class="rank-list" id="projectBars"></div>
       </section>
 
-      <div class="dash-split">
-        <section>
-          <h2>Department mix</h2>
-          <div class="import-card donut-wrap" id="deptMix"></div>
-        </section>
-        <section>
-          <h2>People carrying the cost</h2>
-          <div class="import-card" id="staffBody"></div>
-        </section>
-      </div>
+      <section>
+        <h2>Department mix</h2>
+        <div class="import-card donut-wrap" id="deptMix"></div>
+      </section>
     </div>
 
     <footer>
-      Figures use (project units ÷ denom) × salary Y. They match the HR2 Salary (Actual) result.
+      Figures are project and department totals. Staff names and individual pay are not on this page.
     </footer>
   </main>
 
   <script src="shared.js"></script>
   <script>
-    const { periodLabel, staffStatus, escapeHtml, money, loadJson, HR2_STORE, isHr2Unlocked, lockHr2 } = PCP;
-
-    if (!isHr2Unlocked()) {
-      location.replace("index.html?need=dashboard");
-      throw new Error("HR2 auth required");
-    }
+    const { periodLabel, escapeHtml, money, loadJson, HR2_STORE, isHr2Unlocked, lockHr2 } = PCP;
 
     document.getElementById("btnLock").onclick = () => {
       lockHr2();
@@ -85,59 +74,23 @@
 
     const SLICE = ["#8f6f12", "#e8c547", "#3d2a0c", "#c4a35a", "#b8860b", "#5c4010", "#f0d78c", "#6b4e12", "#d4af37", "#2a2110"];
 
-    function initials(name) {
-      return String(name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+    const readyCheck = isHr2Unlocked();
+    if (!readyCheck) {
+      location.replace("index.html?need=dashboard");
+      throw new Error("HR2 auth required");
     }
 
-    const saved = loadJson(HR2_STORE);
-    const ready = saved && saved.lastResult && Array.isArray(saved.projects) && saved.projects.length;
-    if (!ready) {
-      document.getElementById("periodSub").textContent = "Calculate on HR2 first, then come back here.";
-    } else {
-      const projects = saved.projects;
-      const staff = Array.isArray(saved.staff) ? saved.staff : [];
-      const year = Number(saved.periodYear) || 2026;
-      const month = Number(saved.periodMonth) || 8;
-      const { matrix, depts } = saved.lastResult;
-      const deptList = Array.isArray(depts) ? depts : [];
-
-      const projectRows = projects.map((p) => {
-        const value = deptList.reduce((s, d) => s + (Number(matrix[p.id] && matrix[p.id][d]) || 0), 0);
-        return { label: p.name, value };
-      }).filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
+    function paint(projectRows, deptRows, caption, chipExtra) {
       const grand = projectRows.reduce((s, r) => s + r.value, 0);
-      projectRows.forEach((r) => { r.total = grand; });
-
-      const deptRows = deptList.map((d) => {
-        const value = projects.reduce((s, p) => s + (Number(matrix[p.id] && matrix[p.id][d]) || 0), 0);
-        return { label: d || "No department", value, total: grand };
-      }).filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
-
-      const people = staff.map((person) => {
-        const st = staffStatus(person, projects, year, month);
-        const y = Number(person.y) || 0;
-        let allocated = 0;
-        if (st.denom > 0) {
-          projects.forEach((p) => {
-            const units = Number(person.projects[p.id]) || 0;
-            if (units > 0) allocated += (units / st.denom) * y;
-          });
-        }
-        return { name: person.name, department: person.department || "", allocated, y };
-      }).filter((p) => p.allocated > 0).sort((a, b) => b.allocated - a.allocated);
-
       document.getElementById("empty").classList.add("hidden");
       document.getElementById("dash").classList.remove("hidden");
-      document.getElementById("periodSub").textContent =
-        periodLabel(year, month) + " · ranked by allocated salary";
       document.getElementById("grandFigure").textContent = money(grand);
-      document.getElementById("grandCaption").textContent =
-        periodLabel(year, month) + " · split from " + people.length + " staff";
+      document.getElementById("grandCaption").textContent = caption;
       document.getElementById("chips").innerHTML = [
         projectRows.length + " projects",
         deptRows.length + " departments",
-        people.length + " staff"
-      ].map((t) => `<span>${escapeHtml(t)}</span>`).join("");
+        chipExtra
+      ].filter(Boolean).map((t) => `<span>${escapeHtml(t)}</span>`).join("");
 
       const top = projectRows[0];
       document.getElementById("spotlight").innerHTML = top ? `
@@ -182,13 +135,29 @@
               <strong>${pct(r.value, grand)}</strong>
             </div>`).join("")}
         </div>` : '<p class="hint">No department cost.</p>';
+    }
 
-      document.getElementById("staffBody").innerHTML = people.slice(0, 6).map((p) => `
-        <div class="person">
-          <div class="avatar">${escapeHtml(initials(p.name))}</div>
-          <div><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.department)}</small></div>
-          <div class="amt"><strong>${hkd(p.allocated)}</strong><small>${pct(p.allocated, p.y)} of pay</small></div>
-        </div>`).join("") || '<p class="hint">No staff cost.</p>';
+    const saved = loadJson(HR2_STORE);
+    const ready = saved && saved.lastResult && Array.isArray(saved.projects) && saved.projects.length;
+    if (!ready) {
+      document.getElementById("empty").classList.remove("hidden");
+      document.getElementById("periodSub").textContent = "Calculate on HR2 first. This page will not list staff pay.";
+    } else {
+      const projects = saved.projects;
+      const year = Number(saved.periodYear) || 2026;
+      const month = Number(saved.periodMonth) || 8;
+      const { matrix, depts } = saved.lastResult;
+      const deptList = Array.isArray(depts) ? depts : [];
+      const projectRows = projects.map((p) => {
+        const value = deptList.reduce((s, d) => s + (Number(matrix[p.id] && matrix[p.id][d]) || 0), 0);
+        return { label: p.name, value };
+      }).filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
+      const deptRows = deptList.map((d) => ({
+        label: d || "No department",
+        value: projects.reduce((s, p) => s + (Number(matrix[p.id] && matrix[p.id][d]) || 0), 0)
+      })).filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
+      document.getElementById("periodSub").textContent = periodLabel(year, month) + " · project and department totals";
+      paint(projectRows, deptRows, periodLabel(year, month) + " · from your HR2 calculation", "Your result");
     }
   </script>
 </body>
