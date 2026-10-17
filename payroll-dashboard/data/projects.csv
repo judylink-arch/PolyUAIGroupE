@@ -1,0 +1,19 @@
+﻿project_code,project_name,cost_center,manager
+2107EM20M,Eastern Harbour Tunnel,CC-INFRA,Alan Tse
+2656EM20M,Hotung Secondary School,CC-EDU,Grace Lam
+3083EM20M,Hong Kong Children's Hospital,CC-HOSP,Kelvin Ho
+2435EM21M,School Project (2435),CC-EDU,Grace Lam
+1497EM22M,Shatin Hospital,CC-HOSP,Kelvin Ho
+1611EM22M,North Lantau Hospital,CC-HOSP,Kelvin Ho
+1865EM22M,School Project (1865),CC-EDU,Grace Lam
+1735EM22W,New Territories West,CC-INFRA,Alan Tse
+J210652-C,元朗宏業西街 Yuen Long Wang Yip St W,CC-PRIV,Ivy Cheung
+J220680-C,Kai Tak 1B2,CC-PRIV,Ivy Cheung
+J230682,Tsat Sing Kong,CC-PRIV,Ivy Cheung
+SC1108,焚化爐 Incinerator (MVAC & ELV),CC-INFRA,Alan Tse
+KT1B3,Kai Tak 1B3,CC-PRIV,Ivy Cheung
+GDSKC1,GDS KC1,CC-DC,Peter Wong
+GDSKC2,GDS KC2,CC-DC,Peter Wong
+TENDER-G,General Tendering,CC-TENDER,Ben Liu
+TENDER-E,EMSD Tender,CC-TENDER,Ben Liu
+Admin,Administration,CC-ADMIN,Ben Liu

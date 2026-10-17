@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project payroll dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --ink: #1c2430;
+      --muted: #5c6775;
+      --line: #e2dcd2;
+      --paper: #f4f1ea;
+      --card: #fffcf8;
+      --navy: #1e3a5f;
+      --teal: #0f5c56;
+      --gold: #8a5a12;
+      --gold-bg: #fbf3e4;
+      --ok-bg: #e7f3f1;
+      --bad: #8c2f2f;
+      --bad-bg: #f8e8e6;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 56px; }
+
+    header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-end; margin-bottom: 16px; }
+    .eyebrow { margin: 0 0 4px; color: var(--teal); font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: 30px; letter-spacing: -0.03em; }
+    .sub { margin: 4px 0 0; color: var(--muted); }
+
+    .period {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      gap: 10px;
+      align-items: end;
+      flex-wrap: wrap;
+    }
+
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
+    select, input[type="search"] {
+      font: inherit;
+      color: var(--ink);
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      min-width: 140px;
+    }
+
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+    .tabs button, .toolbar button {
+      font: inherit;
+      font-weight: 650;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--ink);
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    .tabs button.active { background: var(--navy); color: white; border-color: var(--navy); }
+    .toolbar button.primary { background: var(--navy); color: white; border-color: var(--navy); }
+
+    section.panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    h2 { margin: 0 0 10px; font-size: 16px; }
+    h3 { margin: 16px 0 8px; font-size: 14px; }
+
+    .rules { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 14px; }
+    .formula { margin: 0; padding-left: 18px; }
+    .formula li { margin: 6px 0; }
+    .example { background: var(--ok-bg); border-radius: 10px; padding: 12px 14px; }
+    .example p { margin: 0 0 8px; }
+    code { font-family: "SF Mono", ui-monospace, monospace; font-size: 12px; }
+
+    .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 14px; }
+    .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+    .kpi span { display: block; color: var(--muted); font-size: 12px; font-weight: 600; }
+    .kpi strong { display: block; margin-top: 4px; font-size: 20px; letter-spacing: -0.03em; }
+    .kpi em { font-style: normal; color: var(--muted); font-size: 12px; }
+
+    .check { background: var(--ok-bg); color: var(--teal); border-radius: 10px; padding: 10px 12px; font-weight: 650; }
+    .check.bad { background: var(--bad-bg); color: var(--bad); }
+
+    .grid-2 { display: grid; grid-template-columns: 1.4fr 0.8fr; gap: 14px; }
+    .chart-box { position: relative; height: 320px; }
+    .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-size: 11px; letter-spacing: 0.03em; text-transform: uppercase; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr.total td { font-weight: 750; border-top: 2px solid var(--ink); }
+    .scroll { max-height: 460px; overflow: auto; }
+
+    .issues { margin: 0; padding-left: 18px; }
+    .issues li { margin: 4px 0; }
+    .er { color: var(--bad); }
+    .wn { color: var(--gold); }
+    .ok { color: var(--teal); }
+
+    .counts { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .counts span { background: var(--paper); border-radius: 999px; padding: 4px 10px; font-size: 13px; }
+
+    .drop { border: 1px dashed var(--line); border-radius: 10px; padding: 12px; color: var(--muted); }
+    .hidden { display: none; }
+    .note { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+
+    @media (max-width: 900px) {
+      header, .rules, .grid-2, .kpis { display: block; }
+      .kpi { margin-bottom: 8px; }
+      .period { margin-top: 12px; }
+    }
+
+    @media print {
+      .tabs, .period, .toolbar, .filters, .drop { display: none !important; }
+      body { background: white; }
+      .panel, .kpi { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <p class="eyebrow">HR payroll</p>
+        <h1>Project cost dashboard</h1>
+        <p class="sub">Salary stays in this browser. Nothing is sent to a server.</p>
+      </div>
+      <div class="period">
+        <label>View
+          <select id="mode">
+            <option value="m">Month</option>
+            <option value="y">Full year</option>
+            <option value="r">Date range</option>
+          </select>
+        </label>
+        <label id="month-wrap">Month <select id="month"></select></label>
+        <label id="year-wrap" class="hidden">Year <select id="year"></select></label>
+        <label id="from-wrap" class="hidden">From <select id="from"></select></label>
+        <label id="to-wrap" class="hidden">To <select id="to"></select></label>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <button type="button" data-tab="rules" class="active">Calculation rule</button>
+      <button type="button" data-tab="import">Data check</button>
+      <button type="button" data-tab="payroll">Payroll</button>
+      <button type="button" data-tab="allocation">Cost allocation</button>
+      <button type="button" data-tab="dashboard">Manager dashboard</button>
+    </div>
+
+    <div id="rules" class="tab">
+      <section class="panel">
+        <h2>How a month is calculated</h2>
+        <div class="rules">
+          <div>
+            <ol class="formula">
+              <li>Each timesheet cell is one session. Morning <code>am_0900_1330</code> and afternoon <code>pm_1330_1800</code> are each 4 hours (0.5 day).</li>
+              <li>Session count for the month = calendar days × 2. A 30-day month has 60 sessions. A 31-day month has 62.</li>
+              <li>Use the salary row with the latest <code>effective_date</code> on or before that month.</li>
+              <li>Session rate = monthly salary ÷ session count. Hourly rate = session rate ÷ 4.</li>
+              <li>Project cost = session rate × sessions coded to that project. <code>Admin</code> is a project and goes to cost centre CC-ADMIN.</li>
+              <li>AL, SL, CL, PH and OFF are paid leave and rest. They are not charged to a project.</li>
+              <li>A blank cell is paid and unallocated. It raises a warning.</li>
+              <li>NPL is no-pay leave. Deduct session rate × NPL sessions from net pay.</li>
+              <li>Check: project cost + leave and rest + missing + NPL deduction = gross salary.</li>
+            </ol>
+          </div>
+          <div class="example">
+            <p><strong>Worked example</strong></p>
+            <p>Salary 30,000 in a 30-day month → 60 sessions → 500 per session (125 per hour).</p>
+            <p>Morning on one project and afternoon on another → 500 each.</p>
+            <p>Both sessions on the same project → 1,000.</p>
+            <p id="live-example"></p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="import" class="tab hidden">
+      <section class="panel">
+        <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+          <button type="button" class="primary" id="reload">Reload the four sample files</button>
+          <button type="button" id="clear">Clear all data</button>
+        </div>
+        <div class="drop">
+          <p>Or replace the sample with your own files. Expected headers:</p>
+          <p><code>employees.csv</code> employee_id, name, position, department, join_date, status</p>
+          <p><code>salary.csv</code> employee_id, monthly_salary, effective_date, remark</p>
+          <p><code>projects.csv</code> project_code, project_name, cost_center, manager</p>
+          <p><code>timesheet.csv</code> date, employee_id, am_0900_1330, pm_1330_1800</p>
+          <input id="files" type="file" accept=".csv,text/csv" multiple>
+        </div>
+        <h3>Loaded</h3>
+        <div class="counts" id="counts"></div>
+        <h3>Data check for this period</h3>
+        <ul class="issues" id="issues"></ul>
+      </section>
+    </div>
+
+    <div id="payroll" class="tab hidden">
+      <section class="panel">
+        <div class="filters">
+          <label>Department <select id="dept"><option value="">All departments</option></select></label>
+          <label>Search <input id="search" type="search" placeholder="Name or ID"></label>
+          <button type="button" id="export-pay">Export payroll CSV</button>
+        </div>
+        <div class="kpis" id="pay-kpis"></div>
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th><th>Name</th><th>Department</th>
+                <th class="num">Gross</th>
+                <th class="num">Sessions</th>
+                <th class="num">Project</th>
+                <th class="num">Leave</th>
+                <th class="num">NPL</th>
+                <th class="num">Missing</th>
+                <th class="num">Net pay</th>
+              </tr>
+            </thead>
+            <tbody id="pay-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div id="allocation" class="tab hidden">
+      <section class="panel">
+        <p id="balance" class="check"></p>
+        <div class="toolbar" style="display:flex;gap:8px;margin:12px 0;">
+          <button type="button" id="export-alloc">Export allocation CSV</button>
+          <button type="button" id="export-journal">Export journal CSV</button>
+        </div>
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Employee</th><th>Project</th><th>Cost centre</th><th>Manager</th>
+                <th class="num">Sessions</th><th class="num">Hours</th><th class="num">Cost</th>
+              </tr>
+            </thead>
+            <tbody id="alloc-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div id="dashboard" class="tab hidden">
+      <div class="filters">
+        <label>Manager <select id="manager"><option value="">All managers</option></select></label>
+        <label>Cost centre <select id="center"><option value="">All cost centres</option></select></label>
+      </div>
+      <div class="kpis" id="dash-kpis"></div>
+      <div class="grid-2">
+        <section class="panel">
+          <h2>Cost by project</h2>
+          <div class="chart-box"><canvas id="bar"></canvas></div>
+        </section>
+        <section class="panel">
+          <h2>Cost by cost centre</h2>
+          <div class="chart-box"><canvas id="doughnut"></canvas></div>
+        </section>
+      </div>
+      <section class="panel">
+        <h2>Project detail</h2>
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Project</th><th>Cost centre</th><th>Manager</th>
+                <th class="num">Man-days</th><th class="num">Cost</th><th class="num">Share</th>
+              </tr>
+            </thead>
+            <tbody id="project-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const LEAVE = new Set(["AL", "SL", "CL", "PH", "OFF"]);
+    const state = { employees: [], salary: [], projects: [], timesheet: [], ready: false };
+    let result = null;
+    let barChart = null;
+    let doughnutChart = null;
+
+    const $ = (id) => document.getElementById(id);
+
+    function formatMoney(amount) {
+      const rounded = Math.round((amount + Number.EPSILON) * 100) / 100;
+      return rounded.toLocaleString("en-HK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function cents(amount) {
+      return Math.round((amount + Number.EPSILON) * 100);
+    }
+
+    function daysInMonth(month) {
+      const [year, mon] = month.split("-").map(Number);
+      return new Date(year, mon, 0).getDate();
+    }
+
+    function parseCSV(text) {
+      const source = text.replace(/^\uFEFF/, "");
+      const rows = [];
+      let row = [];
+      let cell = "";
+      let quoted = false;
+      for (let i = 0; i < source.length; i++) {
+        const char = source[i];
+        if (quoted) {
+          if (char === '"') {
+            if (source[i + 1] === '"') { cell += '"'; i++; }
+            else quoted = false;
+          } else cell += char;
+        } else if (char === '"') quoted = true;
+        else if (char === ",") { row.push(cell); cell = ""; }
+        else if (char === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; }
+        else if (char !== "\r") cell += char;
+      }
+      if (cell.length || row.length) { row.push(cell); rows.push(row); }
+      const header = (rows.shift() || []).map((name) => name.trim());
+      return rows
+        .filter((values) => values.some((value) => value.trim()))
+        .map((values) => {
+          const record = {};
+          header.forEach((name, index) => { record[name] = (values[index] || "").trim(); });
+          return record;
+        });
+    }
+
+    function salaryOf(employeeId, month) {
+      let best = "";
+      let amount = 0;
+      state.salary.forEach((row) => {
+        if (row.employee_id === employeeId && row.effective_date.slice(0, 7) <= month && row.effective_date >= best) {
+          best = row.effective_date;
+          amount = Number(row.monthly_salary) || 0;
+        }
+      });
+      return amount;
+    }
+
+    function selectedMonths() {
+      const mode = $("mode").value;
+      const all = [...new Set(state.timesheet.map((row) => row.date.slice(0, 7)))].sort();
+      if (mode === "m") return [$("month").value].filter(Boolean);
+      if (mode === "y") return all.filter((month) => month.startsWith($("year").value));
+      const from = $("from").value;
+      const to = $("to").value;
+      return all.filter((month) => month >= from && month <= to);
+    }
+
+    function periodLabel() {
+      const months = result ? result.months : selectedMonths();
+      if (!months.length) return "No period";
+      if ($("mode").value === "m") return months[0];
+      if ($("mode").value === "y") return $("year").value;
+      return months[0] + " to " + months[months.length - 1];
+    }
+
+    function calculate() {
+      const months = selectedMonths();
+      const monthSet = new Set(months);
+      const projects = Object.fromEntries(state.projects.map((project) => [project.project_code, project]));
+      const employees = Object.fromEntries(state.employees.map((employee) => [employee.employee_id, employee]));
+      const issues = [];
+      const seenIssue = new Set();
+      const counts = {};
+      const dayUnits = {};
+
+      function issue(level, text) {
+        if (seenIssue.has(text)) return;
+        seenIssue.add(text);
+        issues.push({ level, text });
+      }
+
+      state.timesheet.forEach((row) => {
+        const month = row.date.slice(0, 7);
+        if (!monthSet.has(month)) return;
+        const employee = employees[row.employee_id];
+        if (!employee) {
+          issue("er", "Unknown employee " + row.employee_id);
+          return;
+        }
+        const bucket = counts[row.employee_id] || (counts[row.employee_id] = {});
+        const monthBucket = bucket[month] || (bucket[month] = {});
+        [row.am, row.pm].forEach((code) => {
+          const value = code || "";
+          if (value && !projects[value] && !LEAVE.has(value) && value !== "NPL") {
+            issue("er", "Unknown code " + value);
+          }
+          monthBucket[value] = (monthBucket[value] || 0) + 1;
+        });
+        const key = row.employee_id + "|" + row.date;
+        dayUnits[key] = (dayUnits[key] || 0) + 1;
+        if (dayUnits[key] > 1) issue("wn", row.employee_id + " has more than 1.0 day on " + row.date);
+      });
+
+      const people = [];
+      const lines = [];
+      state.employees.forEach((employee) => {
+        const person = {
+          employee_id: employee.employee_id,
+          name: employee.name,
+          department: employee.department,
+          position: employee.position,
+          gross: 0,
+          sessions: 0,
+          projectSessions: 0,
+          leaveSessions: 0,
+          nplSessions: 0,
+          missingSessions: 0,
+          projectCost: 0,
+          leaveCost: 0,
+          missingCost: 0,
+          nplCost: 0,
+          net: 0
+        };
+        let salaried = false;
+        months.forEach((month) => {
+          const gross = salaryOf(employee.employee_id, month);
+          if (!gross) return;
+          if (employee.join_date && employee.join_date.slice(0, 7) > month) return;
+          salaried = true;
+          const sessions = daysInMonth(month) * 2;
+          const rate = gross / sessions;
+          const codes = (counts[employee.employee_id] && counts[employee.employee_id][month]) || {};
+          const used = Object.values(codes).reduce((sum, value) => sum + value, 0);
+          const missing = (codes[""] || 0) + Math.max(0, sessions - used);
+          if (used === 0) issue("wn", employee.employee_id + " " + employee.name + " has salary but no attendance in " + month);
+          else if (missing > 0) issue("wn", employee.employee_id + " " + employee.name + ": " + missing + " missing session(s) in " + month);
+
+          let projectSessions = 0;
+          let leaveSessions = 0;
+          Object.entries(codes).forEach(([code, sessionsOnCode]) => {
+            if (!projects[code]) return;
+            projectSessions += sessionsOnCode;
+            const cost = sessionsOnCode * rate;
+            const project = projects[code];
+            lines.push({
+              employee_id: employee.employee_id,
+              name: employee.name,
+              department: employee.department,
+              project_code: code,
+              project_name: project.project_name,
+              cost_center: project.cost_center,
+              manager: project.manager,
+              sessions: sessionsOnCode,
+              cost
+            });
+            if (LEAVE.has(code)) leaveSessions += sessionsOnCode;
+          });
+          Object.entries(codes).forEach(([code, sessionsOnCode]) => {
+            if (LEAVE.has(code)) leaveSessions += sessionsOnCode;
+          });
+          const nplSessions = codes.NPL || 0;
+          person.gross += gross;
+          person.sessions += sessions;
+          person.projectSessions += projectSessions;
+          person.leaveSessions += leaveSessions;
+          person.nplSessions += nplSessions;
+          person.missingSessions += missing;
+          person.projectCost += projectSessions * rate;
+          person.leaveCost += leaveSessions * rate;
+          person.missingCost += missing * rate;
+          person.nplCost += nplSessions * rate;
+          person.net += gross - nplSessions * rate;
+        });
+        if (salaried) people.push(person);
+      });
+
+      if (!people.length) issue("er", "No salary found for this period");
+
+      result = { months, people, lines, issues };
+      renderAll();
+    }
+
+    function totals(people) {
+      return people.reduce((sum, person) => {
+        sum.gross += person.gross;
+        sum.project += person.projectCost;
+        sum.leave += person.leaveCost;
+        sum.missing += person.missingCost;
+        sum.npl += person.nplCost;
+        sum.net += person.net;
+        sum.projectSessions += person.projectSessions;
+        return sum;
+      }, { gross: 0, project: 0, leave: 0, missing: 0, npl: 0, net: 0, projectSessions: 0 });
+    }
+
+    function filteredPeople() {
+      const department = $("dept").value;
+      const query = $("search").value.trim().toLowerCase();
+      return result.people.filter((person) => {
+        if (department && person.department !== department) return false;
+        if (!query) return true;
+        return (person.employee_id + " " + person.name).toLowerCase().includes(query);
+      });
+    }
+
+    function filteredLines() {
+      const manager = $("manager").value;
+      const center = $("center").value;
+      return result.lines.filter((line) => {
+        if (manager && line.manager !== manager) return false;
+        if (center && line.cost_center !== center) return false;
+        return true;
+      });
+    }
+
+    function renderRules() {
+      const month = result.months[result.months.length - 1];
+      const sample = result.people[0];
+      if (!sample || !month) {
+        $("live-example").textContent = "";
+        return;
+      }
+      const days = daysInMonth(month);
+      const rate = sample.gross / result.months.reduce((sum, item) => sum + daysInMonth(item) * 2, 0);
+      $("live-example").textContent = sample.name + " in " + periodLabel() + ": gross " + formatMoney(sample.gross) + ", project cost " + formatMoney(sample.projectCost) + ", net pay " + formatMoney(sample.net) + ". " + days + "-day months use " + (days * 2) + " sessions.";
+      rate;
+    }
+
+    function renderImport() {
+      $("counts").innerHTML = [
+        state.employees.length + " employees",
+        state.salary.length + " salary rows",
+        state.projects.length + " projects",
+        state.timesheet.length.toLocaleString("en-HK") + " timesheet rows"
+      ].map((text) => "<span>" + text + "</span>").join("");
+      const issues = result.issues;
+      $("issues").innerHTML = issues.length
+        ? issues.slice(0, 40).map((item) => `<li class="${item.level}">${item.text}</li>`).join("") + (issues.length > 40 ? `<li>… ${issues.length - 40} more</li>` : "")
+        : `<li class="ok">No issues for ${periodLabel()}.</li>`;
+    }
+
+    function renderPayroll() {
+      const rows = filteredPeople();
+      const sum = totals(rows);
+      $("pay-kpis").innerHTML = [
+        ["Period", periodLabel()],
+        ["Employees", String(rows.length)],
+        ["Gross salary", formatMoney(sum.gross)],
+        ["NPL deduction", formatMoney(sum.npl)],
+        ["Net payroll", formatMoney(sum.net)]
+      ].map(([label, value]) => `<div class="kpi"><span>${label}</span><strong>${value}</strong></div>`).join("");
+      const body = rows.map((person) => `
+        <tr>
+          <td>${person.employee_id}</td>
+          <td>${person.name}</td>
+          <td>${person.department}</td>
+          <td class="num">${formatMoney(person.gross)}</td>
+          <td class="num">${person.sessions}</td>
+          <td class="num">${person.projectSessions}</td>
+          <td class="num">${person.leaveSessions}</td>
+          <td class="num">${person.nplSessions}</td>
+          <td class="num">${person.missingSessions}</td>
+          <td class="num">${formatMoney(person.net)}</td>
+        </tr>`).join("");
+      const total = `
+        <tr class="total">
+          <td colspan="3">Total</td>
+          <td class="num">${formatMoney(sum.gross)}</td>
+          <td class="num"></td>
+          <td class="num">${sum.projectSessions}</td>
+          <td class="num"></td><td class="num"></td><td class="num"></td>
+          <td class="num">${formatMoney(sum.net)}</td>
+        </tr>`;
+      $("pay-body").innerHTML = body + total;
+    }
+
+    function renderAllocation() {
+      const sum = totals(result.people);
+      const unallocated = sum.leave + sum.missing + sum.npl;
+      const balanced = cents(sum.project + unallocated) === cents(sum.gross);
+      const banner = $("balance");
+      banner.className = balanced ? "check" : "check bad";
+      banner.textContent = balanced
+        ? `Check passed for ${periodLabel()}. Project ${formatMoney(sum.project)} + unallocated ${formatMoney(unallocated)} = gross ${formatMoney(sum.gross)}.`
+        : `Check failed. Project + unallocated does not equal gross ${formatMoney(sum.gross)}.`;
+      const grouped = new Map();
+      result.lines.forEach((line) => {
+        const key = line.employee_id + "|" + line.project_code;
+        const current = grouped.get(key) || { ...line, sessions: 0, cost: 0 };
+        current.sessions += line.sessions;
+        current.cost += line.cost;
+        grouped.set(key, current);
+      });
+      const rows = [...grouped.values()].sort((a, b) => b.cost - a.cost || a.name.localeCompare(b.name));
+      $("alloc-body").innerHTML = rows.map((line) => `
+        <tr>
+          <td>${line.name}<div class="note">${line.employee_id}</div></td>
+          <td>${line.project_name}<div class="note">${line.project_code}</div></td>
+          <td>${line.cost_center}</td>
+          <td>${line.manager}</td>
+          <td class="num">${line.sessions}</td>
+          <td class="num">${line.sessions * 4}</td>
+          <td class="num">${formatMoney(line.cost)}</td>
+        </tr>`).join("") + `
+        <tr class="total">
+          <td colspan="6">Allocated to projects</td>
+          <td class="num">${formatMoney(sum.project)}</td>
+        </tr>
+        <tr class="total">
+          <td colspan="6">Unallocated (leave, rest, missing, NPL)</td>
+          <td class="num">${formatMoney(unallocated)}</td>
+        </tr>`;
+    }
+
+    function projectRollup(lines) {
+      const map = new Map();
+      lines.forEach((line) => {
+        const current = map.get(line.project_code) || {
+          project_code: line.project_code,
+          project_name: line.project_name,
+          cost_center: line.cost_center,
+          manager: line.manager,
+          sessions: 0,
+          cost: 0
+        };
+        current.sessions += line.sessions;
+        current.cost += line.cost;
+        map.set(line.project_code, current);
+      });
+      return [...map.values()].sort((a, b) => b.cost - a.cost);
+    }
+
+    function renderDashboard() {
+      const lines = filteredLines();
+      const projects = projectRollup(lines);
+      const cost = projects.reduce((sum, project) => sum + project.cost, 0);
+      const sessions = projects.reduce((sum, project) => sum + project.sessions, 0);
+      const manDays = sessions / 2;
+      const centres = new Set(projects.map((project) => project.cost_center));
+      $("dash-kpis").innerHTML = [
+        ["Project cost", formatMoney(cost), periodLabel()],
+        ["Projects", String(projects.length), centres.size + " cost centres"],
+        ["Man-days", manDays.toLocaleString("en-HK"), sessions.toLocaleString("en-HK") + " sessions"],
+        ["Avg cost / day", manDays ? formatMoney(cost / manDays) : "—", "project cost only"],
+        ["People on projects", String(new Set(lines.map((line) => line.employee_id)).size), "after filters"]
+      ].map(([label, value, note]) => `<div class="kpi"><span>${label}</span><strong>${value}</strong><em>${note}</em></div>`).join("");
+
+      const labels = projects.map((project) => project.project_code);
+      const values = projects.map((project) => Math.round(project.cost * 100) / 100);
+      drawBar(labels, values);
+
+      const byCentre = new Map();
+      projects.forEach((project) => byCentre.set(project.cost_center, (byCentre.get(project.cost_center) || 0) + project.cost));
+      const centreRows = [...byCentre.entries()].sort((a, b) => b[1] - a[1]);
+      drawDoughnut(centreRows.map((row) => row[0]), centreRows.map((row) => Math.round(row[1] * 100) / 100));
+
+      $("project-body").innerHTML = projects.map((project) => `
+        <tr>
+          <td>${project.project_name}<div class="note">${project.project_code}</div></td>
+          <td>${project.cost_center}</td>
+          <td>${project.manager}</td>
+          <td class="num">${(project.sessions / 2).toLocaleString("en-HK")}</td>
+          <td class="num">${formatMoney(project.cost)}</td>
+          <td class="num">${cost ? ((project.cost / cost) * 100).toFixed(1) + "%" : "—"}</td>
+        </tr>`).join("") + `
+        <tr class="total"><td colspan="4">Total</td><td class="num">${formatMoney(cost)}</td><td class="num">100%</td></tr>`;
+    }
+
+    const palette = ["#1e3a5f", "#0f5c56", "#8a5a12", "#3d6b8c", "#6e4c7a", "#9c4a3c", "#4f6f4a", "#b0894f"];
+
+    function drawBar(labels, values) {
+      if (typeof Chart === "undefined") return;
+      if (barChart) barChart.destroy();
+      barChart = new Chart($("bar"), {
+        type: "bar",
+        data: { labels, datasets: [{ data: values, backgroundColor: "#1e3a5f", borderRadius: 4 }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { ticks: { maxRotation: 60, minRotation: 40, font: { size: 10 } } }, y: { ticks: { callback: (value) => Number(value).toLocaleString("en-HK") } } }
+        }
+      });
+    }
+
+    function drawDoughnut(labels, values) {
+      if (typeof Chart === "undefined") return;
+      if (doughnutChart) doughnutChart.destroy();
+      doughnutChart = new Chart($("doughnut"), {
+        type: "doughnut",
+        data: { labels, datasets: [{ data: values, backgroundColor: labels.map((_, index) => palette[index % palette.length]) }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
+      });
+    }
+
+    function renderAll() {
+      renderRules();
+      renderImport();
+      renderPayroll();
+      renderAllocation();
+      renderDashboard();
+    }
+
+    function fillPeriodSelectors() {
+      const months = [...new Set(state.timesheet.map((row) => row.date.slice(0, 7)))].sort();
+      const years = [...new Set(months.map((month) => month.slice(0, 4)))];
+      const options = (values) => values.map((value) => `<option>${value}</option>`).join("");
+      const keep = [$("month").value, $("year").value, $("from").value, $("to").value];
+      $("month").innerHTML = options(months);
+      $("year").innerHTML = options(years);
+      $("from").innerHTML = options(months);
+      $("to").innerHTML = options(months);
+      $("month").value = months.includes(keep[0]) ? keep[0] : months[months.length - 1];
+      $("year").value = years.includes(keep[1]) ? keep[1] : years[years.length - 1];
+      $("from").value = months.includes(keep[2]) ? keep[2] : months[0];
+      $("to").value = months.includes(keep[3]) ? keep[3] : months[months.length - 1];
+
+      const departments = [...new Set(state.employees.map((employee) => employee.department))].sort();
+      const managers = [...new Set(state.projects.map((project) => project.manager))].sort();
+      const centres = [...new Set(state.projects.map((project) => project.cost_center))].sort();
+      $("dept").innerHTML = `<option value="">All departments</option>` + options(departments);
+      $("manager").innerHTML = `<option value="">All managers</option>` + options(managers);
+      $("center").innerHTML = `<option value="">All cost centres</option>` + options(centres);
+    }
+
+    function showMode() {
+      const mode = $("mode").value;
+      $("month-wrap").classList.toggle("hidden", mode !== "m");
+      $("year-wrap").classList.toggle("hidden", mode !== "y");
+      $("from-wrap").classList.toggle("hidden", mode !== "r");
+      $("to-wrap").classList.toggle("hidden", mode !== "r");
+    }
+
+    function adopt(kind, records) {
+      if (kind === "employees") state.employees = records;
+      if (kind === "salary") state.salary = records;
+      if (kind === "projects") state.projects = records;
+      if (kind === "timesheet") {
+        state.timesheet = records.map((row) => ({
+          date: row.date,
+          employee_id: row.employee_id,
+          am: row.am_0900_1330 || "",
+          pm: row.pm_1330_1800 || ""
+        }));
+      }
+    }
+
+    function fileKind(records) {
+      const keys = Object.keys(records[0] || {});
+      if (keys.includes("am_0900_1330")) return "timesheet";
+      if (keys.includes("monthly_salary")) return "salary";
+      if (keys.includes("project_code")) return "projects";
+      if (keys.includes("employee_id") && keys.includes("name")) return "employees";
+      return "";
+    }
+
+    function readyEnough() {
+      return state.employees.length && state.salary.length && state.projects.length && state.timesheet.length;
+    }
+
+    function afterLoad() {
+      if (!readyEnough()) return;
+      state.ready = true;
+      fillPeriodSelectors();
+      showMode();
+      calculate();
+    }
+
+    async function loadSample() {
+      const names = ["employees.csv", "salary.csv", "projects.csv", "timesheet.csv"];
+      const texts = await Promise.all(names.map(async (name) => {
+        const response = await fetch("data/" + name);
+        if (!response.ok) throw new Error(name);
+        return response.text();
+      }));
+      names.forEach((name, index) => {
+        const records = parseCSV(texts[index]);
+        adopt(fileKind(records), records);
+      });
+      afterLoad();
+    }
+
+    function download(filename, rows) {
+      const header = Object.keys(rows[0] || { note: "No rows" });
+      const escape = (value) => {
+        const text = String(value ?? "");
+        return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+      };
+      const csv = [header.join(",")].concat(rows.map((row) => header.map((key) => escape(row[key])).join(","))).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    function exportPayroll() {
+      const rows = filteredPeople().map((person) => ({
+        employee_id: person.employee_id,
+        name: person.name,
+        department: person.department,
+        position: person.position,
+        gross_salary: (Math.round(person.gross * 100) / 100).toFixed(2),
+        total_sessions: person.sessions,
+        project_sessions: person.projectSessions,
+        project_hours: person.projectSessions * 4,
+        leave_rest_sessions: person.leaveSessions,
+        npl_sessions: person.nplSessions,
+        missing_sessions: person.missingSessions,
+        project_cost: (Math.round(person.projectCost * 100) / 100).toFixed(2),
+        npl_deduction: (Math.round(person.nplCost * 100) / 100).toFixed(2),
+        net_payroll: (Math.round(person.net * 100) / 100).toFixed(2)
+      }));
+      download("payroll_" + periodLabel().replaceAll(" ", "_") + ".csv", rows);
+    }
+
+    function exportAllocation() {
+      const grouped = new Map();
+      result.lines.forEach((line) => {
+        const key = [line.employee_id, line.project_code].join("|");
+        const current = grouped.get(key) || { ...line, sessions: 0, cost: 0 };
+        current.sessions += line.sessions;
+        current.cost += line.cost;
+        grouped.set(key, current);
+      });
+      const rows = [...grouped.values()].map((line) => ({
+        employee_id: line.employee_id,
+        name: line.name,
+        project_code: line.project_code,
+        project_name: line.project_name,
+        cost_center: line.cost_center,
+        manager: line.manager,
+        sessions: line.sessions,
+        hours: line.sessions * 4,
+        cost: (Math.round(line.cost * 100) / 100).toFixed(2)
+      }));
+      download("allocation_" + periodLabel().replaceAll(" ", "_") + ".csv", rows);
+    }
+
+    function exportJournal() {
+      const byCentre = new Map();
+      result.lines.forEach((line) => byCentre.set(line.cost_center, (byCentre.get(line.cost_center) || 0) + line.cost));
+      const sum = totals(result.people);
+      const rows = [...byCentre.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([centre, amount]) => ({
+        entry: "Dr",
+        account: "Salary expense",
+        cost_center: centre,
+        debit: (Math.round(amount * 100) / 100).toFixed(2),
+        credit: ""
+      }));
+      const unallocatedPaid = sum.leave + sum.missing;
+      rows.push({
+        entry: "Dr",
+        account: "Salary expense",
+        cost_center: "UNALLOCATED",
+        debit: (Math.round(unallocatedPaid * 100) / 100).toFixed(2),
+        credit: ""
+      });
+      rows.push({
+        entry: "Cr",
+        account: "Salary payable",
+        cost_center: "",
+        debit: "",
+        credit: (Math.round(sum.net * 100) / 100).toFixed(2)
+      });
+      download("journal_" + periodLabel().replaceAll(" ", "_") + ".csv", rows);
+    }
+
+    document.querySelectorAll(".tabs button").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".tabs button").forEach((item) => item.classList.remove("active"));
+        button.classList.add("active");
+        document.querySelectorAll(".tab").forEach((tab) => tab.classList.add("hidden"));
+        $(button.dataset.tab).classList.remove("hidden");
+        if (button.dataset.tab === "dashboard" && result) renderDashboard();
+      });
+    });
+
+    ["mode", "month", "year", "from", "to"].forEach((id) => {
+      $(id).addEventListener("change", () => {
+        showMode();
+        if (state.ready) calculate();
+      });
+    });
+    ["dept", "search", "manager", "center"].forEach((id) => {
+      $(id).addEventListener("input", () => { if (result) { renderPayroll(); renderDashboard(); } });
+      $(id).addEventListener("change", () => { if (result) { renderPayroll(); renderDashboard(); } });
+    });
+
+    $("reload").addEventListener("click", () => loadSample().catch(() => {
+      $("issues").innerHTML = `<li class="er">Could not read the sample files. Open this page from the payroll-dashboard folder, or upload the four CSVs.</li>`;
+    }));
+    $("clear").addEventListener("click", () => {
+      state.employees = [];
+      state.salary = [];
+      state.projects = [];
+      state.timesheet = [];
+      state.ready = false;
+      result = { months: [], people: [], lines: [], issues: [{ level: "wn", text: "Data cleared. Reload the sample files or upload CSVs." }] };
+      renderAll();
+    });
+    $("files").addEventListener("change", async (event) => {
+      const files = [...event.target.files];
+      for (const file of files) {
+        const records = parseCSV(await file.text());
+        const kind = fileKind(records);
+        if (kind) adopt(kind, records);
+      }
+      afterLoad();
+    });
+    $("export-pay").addEventListener("click", exportPayroll);
+    $("export-alloc").addEventListener("click", exportAllocation);
+    $("export-journal").addEventListener("click", exportJournal);
+
+    loadSample().catch(() => {
+      $("issues").innerHTML = `<li class="wn">Upload employees.csv, salary.csv, projects.csv and timesheet.csv to calculate.</li>`;
+      document.querySelector('[data-tab="import"]').click();
+    });
+  </script>
+</body>
+</html>
