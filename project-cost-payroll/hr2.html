@@ -31,7 +31,7 @@
       </div>
       <div class="rights-box hr2">
         <strong>HR2 can</strong>
-        Import Staff Check + salary Y, calculate, download reports, open the cost dashboard.
+        Import Staff Check + salary Y, calculate, download reports, open the cost dashboard, and Project Staff Involvement %.
       </div>
     </div>
 
@@ -105,6 +105,7 @@
         <button type="button" class="btn" id="btnCalculate">Calculate project cost</button>
         <button type="button" class="btn btn-secondary" id="btnExportSalaryActual">Download Salary (Actual) Result (Excel)</button>
         <button type="button" class="btn btn-secondary" id="btnExportCombined">Download Project Analysis (Excel)</button>
+        <button type="button" class="btn btn-secondary" id="btnExportStaffAlloc">Download Project Staff Involvement % (Excel)</button>
         <a class="btn btn-small" id="btnDashboard" href="dashboard.html" style="text-decoration:none;">Open cost dashboard</a>
         <a class="btn btn-secondary btn-small" href="senior.html" style="text-decoration:none;">Senior view</a>
         <p class="status" id="hr2Status">Import both files, then Calculate.</p>
@@ -112,6 +113,9 @@
       <h3>Salary (Actual) style result</h3>
       <div id="resultArea" class="locked-panel">Not calculated yet.</div>
       <div id="denomNotes" class="hint" style="margin-top:12px;"></div>
+      <h3>Staff involvement % by Project</h3>
+      <p class="hint">Involvement % = project units ÷ denom (per staff). No individual salary shown.</p>
+      <div id="staffAllocArea" class="locked-panel">Calculate first to preview involvement % by project.</div>
     </section>
 
     <footer>
@@ -275,6 +279,126 @@
       return lastResult;
     }
 
+    function fmtPct(share) {
+      if (!(share > 0)) return "";
+      return Math.round(share * 10000) / 100;
+    }
+
+    function projectInvolvementRows() {
+      const header = ["Project Name", ...staff.map((p) => p.staffId), "Staff count", "Sum of %"];
+      const nameHeader = ["(Employee Name)", ...staff.map((p) => p.name), "", ""];
+      const rows = [header, nameHeader];
+      const detail = [[
+        "Project", "Staff ID", "Employee Name", "Department",
+        "Units", "Denom", "Involvement %"
+      ]];
+
+      projects.forEach((proj) => {
+        const cells = [];
+        let sumPct = 0;
+        let count = 0;
+        staff.forEach((person) => {
+          const st = staffStatus(person, projects, periodYear, periodMonth);
+          const units = Number(person.projects[proj.id]) || 0;
+          let share = 0;
+          if (st.denom > 0 && units > 0) share = units / st.denom;
+          const pct = fmtPct(share);
+          cells.push(pct === "" ? "" : pct);
+          if (share > 0) {
+            sumPct += pct;
+            count++;
+            detail.push([
+              proj.name,
+              person.staffId,
+              person.name,
+              person.department || "",
+              units,
+              st.denom,
+              pct
+            ]);
+          }
+        });
+        rows.push([
+          proj.name,
+          ...cells,
+          count,
+          Math.round(sumPct * 100) / 100
+        ]);
+      });
+
+      return { summary: rows, detail };
+    }
+
+    function renderStaffAllocPreview() {
+      const area = document.getElementById("staffAllocArea");
+      if (!lastResult) {
+        area.className = "locked-panel";
+        area.textContent = "Calculate first to preview involvement % by project.";
+        return;
+      }
+      const { summary } = projectInvolvementRows();
+      const bodyRows = summary.slice(2);
+      const showStaff = Math.min(staff.length, 6);
+      const headHtml = [
+        "<th>Project</th>",
+        ...staff.slice(0, showStaff).map((p) => `<th class="num">${escapeHtml(p.staffId)}</th>`),
+        (staff.length > showStaff ? "<th>…</th>" : ""),
+        '<th class="num">Staff count</th>',
+        '<th class="num">Sum of %</th>'
+      ].join("");
+      const rowsHtml = bodyRows.map((r) => {
+        const projName = r[0];
+        const count = r[r.length - 2];
+        const sumPct = r[r.length - 1];
+        const staffCells = [];
+        for (let i = 0; i < showStaff; i++) {
+          const v = r[1 + i];
+          staffCells.push(`<td class="num">${v === "" || v == null ? "—" : v + "%"}</td>`);
+        }
+        return `<tr>
+          <td>${escapeHtml(projName)}</td>
+          ${staffCells.join("")}
+          ${staff.length > showStaff ? "<td>…</td>" : ""}
+          <td class="num">${count}</td>
+          <td class="num"><strong>${sumPct}%</strong></td>
+        </tr>`;
+      }).join("");
+      area.className = "matrix-wrap";
+      area.style.maxHeight = "360px";
+      area.innerHTML = `<table>
+        <thead><tr>${headHtml}</tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+    }
+
+    function exportStaffAllocation() {
+      if (!lastResult) throw new Error("Calculate first.");
+      const { summary, detail } = projectInvolvementRows();
+      downloadExcelMulti(
+        "Project_Staff_Involvement_Pct_" + fileStamp(periodYear, periodMonth) + ".xlsx",
+        [
+          {
+            name: "By Project %",
+            rows: [
+              [periodLabel(periodYear, periodMonth)],
+              ["Involvement % = project units ÷ denom. No individual salary."],
+              [],
+              ...summary
+            ]
+          },
+          {
+            name: "Detail",
+            rows: [
+              [periodLabel(periodYear, periodMonth)],
+              ["Staff involved on each project (%, no salary)."],
+              [],
+              ...detail
+            ]
+          }
+        ]
+      );
+    }
+
     function renderResult() {
       const area = document.getElementById("resultArea");
       const notesEl = document.getElementById("denomNotes");
@@ -282,6 +406,7 @@
         area.className = "locked-panel";
         area.textContent = "Not calculated yet.";
         notesEl.textContent = "";
+        renderStaffAllocPreview();
         return;
       }
       const { matrix, notes, depts } = lastResult;
@@ -313,6 +438,7 @@
         const edge = n.edge ? " · edge (0 units → HKD 0)" : "";
         return `${escapeHtml(n.name)}: denom ${n.denom} = units ${n.projectUnits}; Y ${money(n.y)}${edge}`;
       }).join("<br />") + (notes.length > 20 ? "<br />… +" + (notes.length - 20) + " more" : "");
+      renderStaffAllocPreview();
     }
 
     function buildSalaryActualRows() {
@@ -526,6 +652,17 @@
       try {
         exportProjectAnalysis();
         document.getElementById("hr2Status").textContent = "Downloaded Project Analysis.";
+        document.getElementById("hr2Status").className = "status ok";
+      } catch (e) {
+        document.getElementById("hr2Status").textContent = e.message;
+        document.getElementById("hr2Status").className = "status err";
+      }
+    };
+    document.getElementById("btnExportStaffAlloc").onclick = () => {
+      try {
+        exportStaffAllocation();
+        document.getElementById("hr2Status").textContent =
+          "Downloaded Project Staff Involvement % (no individual salary).";
         document.getElementById("hr2Status").className = "status ok";
       } catch (e) {
         document.getElementById("hr2Status").textContent = e.message;
