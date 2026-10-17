@@ -506,11 +506,11 @@
     }
     .gate-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, 1fr);
       gap: 14px;
       margin-top: 20px;
     }
-    @media (max-width: 700px) { .gate-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 900px) { .gate-grid { grid-template-columns: 1fr; } }
     .access-card {
       border: 1px solid var(--line);
       border-radius: 16px;
